@@ -1,0 +1,5 @@
+{
+  "name": "Atlanta Namadwaar Home Program Booking",
+  "description": "A devotional booking platform for Atlanta Namadwaar home programs, allowing devotees to schedule Radha Kalyanam, Nikunja Utsavam, Nama Ruchi, and Nama Bhiksha events with automated Google Sheets logging.",
+  "requestFramePermissions": []
+}
