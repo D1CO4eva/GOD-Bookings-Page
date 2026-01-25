@@ -7,7 +7,7 @@ import BookingForm from './components/BookingForm';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
 import { Page, DevotionalProgram, BookingData, TimeSlot } from './types';
-import { PROGRAMS, GOOGLE_SCRIPT_URL } from './constants';
+import { PROGRAMS } from './constants';
 import { fetchBookedDates, submitToGoogleSheets } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
 
@@ -34,7 +34,7 @@ const App: React.FC = () => {
 
     const loadBookedDates = async () => {
       try {
-        const dates = await fetchBookedDates(GOOGLE_SCRIPT_URL);
+        const dates = await fetchBookedDates();
         if (isMounted) {
           setBookedDates(dates);
         }
@@ -81,7 +81,7 @@ const App: React.FC = () => {
   const handleSubmit = async (data: BookingData) => {
     setIsSubmitting(true);
     try {
-      const latestBookedDates = await fetchBookedDates(GOOGLE_SCRIPT_URL);
+      const latestBookedDates = await fetchBookedDates();
       setBookedDates(latestBookedDates);
 
       if (selectedDate) {
@@ -92,7 +92,7 @@ const App: React.FC = () => {
         }
       }
 
-      const success = await submitToGoogleSheets(GOOGLE_SCRIPT_URL, data);
+      const success = await submitToGoogleSheets(data);
       if (success) {
         // Add the date to the booked list so it can't be booked again this session
         if (selectedDate) {

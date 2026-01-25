@@ -1,11 +1,12 @@
 
 import { BookingData } from '../types';
-import { GOOGLE_SCRIPT_READ_TOKEN, GOOGLE_SCRIPT_WRITE_TOKEN } from '../constants';
 
-export const submitToGoogleSheets = async (url: string, data: BookingData): Promise<boolean> => {
+const API_BASE = '';
+const BOOKINGS_ENDPOINT = `${API_BASE}/api/bookings`;
+
+export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> => {
   try {
     const payload: Record<string, string> = {
-      'token': GOOGLE_SCRIPT_WRITE_TOKEN,
       'Date': data.date,
       'Time': data.time,
       'Type of Program': data.typeOfProgram,
@@ -19,9 +20,8 @@ export const submitToGoogleSheets = async (url: string, data: BookingData): Prom
     
     // We send as a POST to the Web App URL. 
     // mode: 'no-cors' is common for Apps Script endpoints to bypass cross-origin restrictions on simple POSTs.
-    await fetch(url, {
+    await fetch(BOOKINGS_ENDPOINT, {
       method: 'POST',
-      mode: 'no-cors',
       cache: 'no-cache',
       headers: {
         'Content-Type': 'application/json',
@@ -154,12 +154,9 @@ const extractBookedDates = (data: unknown): string[] => {
   return dates;
 };
 
-export const fetchBookedDates = async (url: string): Promise<string[]> => {
+export const fetchBookedDates = async (): Promise<string[]> => {
   try {
-    const readUrl = new URL(url);
-    readUrl.searchParams.set('token', GOOGLE_SCRIPT_READ_TOKEN);
-
-    const response = await fetch(readUrl.toString(), {
+    const response = await fetch(BOOKINGS_ENDPOINT, {
       method: 'GET',
       cache: 'no-cache'
     });

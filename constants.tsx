@@ -52,10 +52,3 @@ export const PROGRAMS: DevotionalProgram[] = [
     imageUrl: 'https://godivinity.org/wp-content/uploads/2023/06/WhatsApp-Image-2023-06-24-at-8.47.17-PM-3.jpeg'
   }
 ];
-
-// Updated production Google Apps Script Web App endpoint as requested
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWtbEyZZcjEiCJuKSZrVXhQqKaPiDrigSYzUlSnszhbf6YVfaYB5Gy0jba5KN6pB68/exec';
-// Auth token expected by your Apps Script schema
-export const GOOGLE_SCRIPT_WRITE_TOKEN = 'pL9kM2rV5zQ7xS4fH1jT9gB3mC0nB6vA8uY2wX7hE1zK5qP9rD4fS6tG0mZ2vL8n';
-// Auth token expected by your Apps Script schema for read actions
-export const GOOGLE_SCRIPT_READ_TOKEN = 'fd458f8e46s45djfdk54dTgDkecfe5f8e4sd4f64ege4458884df564e84D54F46';
