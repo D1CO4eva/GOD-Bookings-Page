@@ -27,6 +27,7 @@ export interface TimeSlot {
 export interface BookingData {
   typeOfProgram: string;
   date: string;
+  time: string;
   name: string;
   email: string;
   phoneNumber: string;

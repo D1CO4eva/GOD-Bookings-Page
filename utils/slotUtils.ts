@@ -101,7 +101,7 @@ export const isDateSelectable = (programId: string, date: Date, bookedDates: str
     return false;
   }
 
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = date.toLocaleDateString('en-CA');
   if (bookedDates.includes(dateStr)) {
     return false;
   }

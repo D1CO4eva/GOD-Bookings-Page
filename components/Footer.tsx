@@ -51,11 +51,16 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="border-t border-white/10 pt-10 flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-indigo-300">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 md:flex-1 md:justify-start">
             <i className="fas fa-map-marker-alt"></i>
             <p>Atlanta Namadwaar • Serving the Devotee Community</p>
           </div>
-          <p>© {new Date().getFullYear()} Atlanta Namadwaar. All rights reserved.</p>
+          <div className="text-center md:flex-1">
+            <p className="text-xs uppercase tracking-widest text-indigo-200 mb-2 font-semibold">Contact Us</p>
+            <p className="font-semibold text-indigo-100">atlantanamadwaar@gmail.com</p>
+            <p className="font-semibold text-indigo-100">678-427-8530</p>
+          </div>
+          <p className="md:flex-1 md:text-right">© {new Date().getFullYear()} Atlanta Namadwaar. All rights reserved.</p>
         </div>
       </div>
     </footer>

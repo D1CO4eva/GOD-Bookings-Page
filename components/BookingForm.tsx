@@ -47,12 +47,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ program, selectedDate, select
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      const fullDateStr = `${selectedDate.toLocaleDateString()} | ${selectedSlot.start} - ${selectedSlot.end} (${selectedSlot.durationLabel})`;
+      const dateIso = selectedDate.toLocaleDateString('en-CA');
+      const timeLabel = selectedSlot.start;
       const fullAddressStr = `${formData.street}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
       
       const payload: BookingData = {
         typeOfProgram: program.name,
-        date: fullDateStr,
+        date: dateIso,
+        time: timeLabel,
         name: formData.name,
         email: formData.email,
         phoneNumber: formData.phoneNumber,

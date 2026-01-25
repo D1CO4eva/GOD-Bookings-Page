@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import ProgramCard from './components/ProgramCard';
 import CalendarView from './components/CalendarView';
@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
 import { Page, DevotionalProgram, BookingData, TimeSlot } from './types';
 import { PROGRAMS, GOOGLE_SCRIPT_URL } from './constants';
-import { submitToGoogleSheets } from './services/googleSheetsService';
+import { fetchBookedDates, submitToGoogleSheets } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
 
 const App: React.FC = () => {
@@ -21,6 +21,36 @@ const App: React.FC = () => {
   
   // Track booked dates to prevent double-booking on same day
   const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [localBookedDates, setLocalBookedDates] = useState<string[]>([]);
+  const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(true);
+
+  const blockedDates = useMemo(
+    () => Array.from(new Set([...bookedDates, ...localBookedDates])),
+    [bookedDates, localBookedDates]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadBookedDates = async () => {
+      try {
+        const dates = await fetchBookedDates(GOOGLE_SCRIPT_URL);
+        if (isMounted) {
+          setBookedDates(dates);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingBookedDates(false);
+        }
+      }
+    };
+
+    loadBookedDates();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleProgramSelect = (program: DevotionalProgram) => {
     setSelectedProgram(program);
@@ -43,25 +73,39 @@ const App: React.FC = () => {
 
   const handleResetBookedDates = () => {
     if (window.confirm("This will clear all blocked dates in your current browser session. Do you want to continue?")) {
-      setBookedDates([]);
+      setLocalBookedDates([]);
       alert("Calendar reset successful.");
     }
   };
 
   const handleSubmit = async (data: BookingData) => {
     setIsSubmitting(true);
-    const success = await submitToGoogleSheets(GOOGLE_SCRIPT_URL, data);
-    setIsSubmitting(false);
-    if (success) {
-      // Add the date to the booked list so it can't be booked again this session
+    try {
+      const latestBookedDates = await fetchBookedDates(GOOGLE_SCRIPT_URL);
+      setBookedDates(latestBookedDates);
+
       if (selectedDate) {
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        setBookedDates(prev => [...prev, dateStr]);
+        const dateStr = selectedDate.toLocaleDateString('en-CA');
+        if (latestBookedDates.includes(dateStr)) {
+          alert("Sorry, that date was just booked. Please choose another date.");
+          return;
+        }
       }
-      setCurrentPage(Page.SUCCESS);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      alert("Submission failed. Please check your internet connection or verify the Google Script URL.");
+
+      const success = await submitToGoogleSheets(GOOGLE_SCRIPT_URL, data);
+      if (success) {
+        // Add the date to the booked list so it can't be booked again this session
+        if (selectedDate) {
+          const dateStr = selectedDate.toLocaleDateString('en-CA');
+          setLocalBookedDates(prev => (prev.includes(dateStr) ? prev : [...prev, dateStr]));
+        }
+        setCurrentPage(Page.SUCCESS);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert("Submission failed. Please check your internet connection or verify the Google Script URL.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -147,7 +191,7 @@ const App: React.FC = () => {
                       programId={selectedProgram!.id} 
                       onSelectDate={handleDateSelect}
                       selectedDate={selectedDate}
-                      bookedDates={bookedDates}
+                      bookedDates={blockedDates}
                     />
                   </div>
                 </div>
@@ -213,6 +257,14 @@ const App: React.FC = () => {
                     )}
                   </div>
                 </div>
+              </div>
+              <div className="mt-12 flex justify-center">
+                <button
+                  onClick={() => setCurrentPage(Page.HOME)}
+                  className="px-10 py-3 rounded-xl border-2 border-[#2E3192] text-[#2E3192] font-bold hover:bg-[#2E3192] hover:text-white transition-all shadow-sm"
+                >
+                  Back to Homepage
+                </button>
               </div>
             </div>
           </section>
@@ -313,9 +365,9 @@ const App: React.FC = () => {
 
                 <h3 className="text-xl font-bold mb-4">Apps Script Setup</h3>
                 <ol className="list-decimal pl-6 space-y-4">
-                  <li>In Google Sheets, go to <strong>Extensions > Apps Script</strong>.</li>
+                  <li>In Google Sheets, go to <strong>Extensions &gt; Apps Script</strong>.</li>
                   <li>Paste your <code>doPost</code> function.</li>
-                  <li>Click <strong>Deploy > New Deployment</strong>, select <strong>Web App</strong>.</li>
+                  <li>Click <strong>Deploy &gt; New Deployment</strong>, select <strong>Web App</strong>.</li>
                   <li>Set Access to <strong>Anyone</strong>.</li>
                   <li>Copy the Web App URL and paste it into <code>constants.tsx</code>.</li>
                 </ol>
@@ -331,6 +383,17 @@ const App: React.FC = () => {
         return null;
     }
   };
+
+  if (isLoadingBookedDates) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white text-gray-700">
+        <div className="text-center space-y-3">
+          <div className="text-sm uppercase tracking-widest text-gray-400 font-bold">Loading</div>
+          <div className="text-2xl font-bold text-[#2E3192] serif">Checking booked dates...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[#FFCC00] selection:text-[#2E3192]">
