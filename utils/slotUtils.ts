@@ -29,6 +29,12 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
       addSlot(10, 0, 13, 0, '3 Hours');
       addSlot(16, 0, 19, 0, '3 Hours');
     }
+  } else if (programId === 'thirumanjanam') {
+    if (isWeekend) {
+      addSlot(10, 0, 12, 0, '2 Hours');
+      addSlot(10, 15, 12, 15, '2 Hours');
+      addSlot(10, 30, 12, 30, '2 Hours');
+    }
   } else if (programId === 'nikunja-utsavam') {
     if (isWeekend) {
       // Morning window: 10:00 - 12:30
@@ -107,7 +113,7 @@ export const isDateSelectable = (programId: string, date: Date, bookedDates: str
   }
 
   const day = date.getDay();
-  if (programId === 'radha-kalyanam' || programId === 'nikunja-utsavam') {
+  if (programId === 'radha-kalyanam' || programId === 'nikunja-utsavam' || programId === 'thirumanjanam') {
     return day === 0 || day === 6;
   }
   if (programId === 'nama-ruchi') {

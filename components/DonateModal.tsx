@@ -5,9 +5,11 @@ import { ZELLE_EMAIL, COLORS } from '../constants';
 interface DonateModalProps {
   isOpen: boolean;
   onClose: () => void;
+  title?: string;
+  message?: string;
 }
 
-const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose }) => {
+const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose, title, message }) => {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
@@ -36,8 +38,10 @@ const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose }) => {
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
             <i className="fas fa-hand-holding-heart text-3xl"></i>
           </div>
-          <h2 className="text-2xl font-bold serif">Support Our Mission</h2>
-          <p className="text-purple-100 text-sm mt-2">Your contribution helps us share divine bliss with everyone.</p>
+          <h2 className="text-2xl font-bold serif">{title || 'Support Our Mission'}</h2>
+          <p className="text-purple-100 text-sm mt-2">
+            {message || 'Your contribution helps us share divine bliss with everyone.'}
+          </p>
         </div>
 
         <div className="p-8 space-y-6">

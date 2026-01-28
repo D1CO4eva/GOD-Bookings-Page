@@ -33,6 +33,15 @@ export const PROGRAMS: DevotionalProgram[] = [
     imageUrl: 'https://godivinity.org/wp-content/uploads/2021/08/WhatsApp-Image-2021-08-28-at-3.13.27-PM.jpeg'
   },
   {
+    id: 'thirumanjanam',
+    name: 'Thirumanjanam',
+    description: 'Holy bath for Sri Radha and Krishna at your home residence.',
+    duration: '2 Hours',
+    icon: 'fa-water',
+    donationAmount: '$301',
+    imageUrl: 'https://godivinity.org/wp-content/uploads/2022/03/WhatsApp-Image-2022-03-28-at-8.57.40-PM.jpeg'
+  },
+  {
     id: 'nama-ruchi',
     name: 'Nama Ruchi',
     description: 'A satsang designed to build taste (ruchi) for the Holy Name through kirtan, reflection, and association.',

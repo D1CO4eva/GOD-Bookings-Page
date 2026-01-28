@@ -40,6 +40,12 @@ export interface BookingData {
   additionalNotes: string;
 }
 
+export interface BookingRecord {
+  date: string;
+  type: string;
+  time?: string;
+}
+
 export interface FormErrors {
   [key: string]: string;
 }

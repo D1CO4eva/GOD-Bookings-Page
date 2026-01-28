@@ -1,5 +1,5 @@
 
-import { BookingData } from '../types';
+import { BookingData, BookingRecord } from '../types';
 
 const API_BASE = '';
 const BOOKINGS_ENDPOINT = `${API_BASE}/api/bookings`;
@@ -17,9 +17,7 @@ export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> 
       'Occasion': data.occasion,
       'Additional Notes': data.additionalNotes
     };
-    
-    // We send as a POST to the Web App URL. 
-    // mode: 'no-cors' is common for Apps Script endpoints to bypass cross-origin restrictions on simple POSTs.
+
     await fetch(BOOKINGS_ENDPOINT, {
       method: 'POST',
       cache: 'no-cache',
@@ -58,65 +56,73 @@ const normalizeDateString = (value: string): string | null => {
   return null;
 };
 
-const extractDatesFromRow = (row: unknown): string[] => {
-  const dates: string[] = [];
+const normalizeProgramName = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
 
-  if (typeof row === 'string') {
-    const normalized = normalizeDateString(row);
-    if (normalized) dates.push(normalized);
-    return dates;
-  }
+const normalizeTimeString = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+};
 
+const extractBookingsFromRow = (
+  row: unknown,
+  dateCol: number,
+  programCol: number,
+  timeCol: number
+): BookingRecord[] => {
   if (Array.isArray(row)) {
-    for (const cell of row) {
-      if (typeof cell === 'string') {
-        const normalized = normalizeDateString(cell);
-        if (normalized) {
-          dates.push(normalized);
-          break;
-        }
+    const rawDate = row[dateCol];
+    const rawType = programCol >= 0 ? row[programCol] : '';
+    const rawTime = timeCol >= 0 ? row[timeCol] : '';
+    const date =
+      typeof rawDate === 'string'
+        ? normalizeDateString(rawDate)
+        : normalizeDateString(String(rawDate));
+    if (!date) return [];
+    return [
+      {
+        date,
+        type: typeof rawType === 'string' ? rawType : String(rawType || ''),
+        time: normalizeTimeString(rawTime)
       }
-    }
-    return dates;
+    ];
   }
 
   if (row && typeof row === 'object') {
     const obj = row as Record<string, unknown>;
-    const candidateKeys = [
-      'Date',
-      'date',
-      'Date of Program',
-      'Date of Program (YYYY-MM-DD)',
-      'Program Date'
+    const rawDate =
+      obj.date ||
+      obj.Date ||
+      obj['Program Date'] ||
+      obj['Date of Program'] ||
+      obj['Date of Program (YYYY-MM-DD)'];
+    const rawType = obj.type || obj.Type || obj['Type of Program'] || obj.program || obj.Program;
+    const rawTime = obj.time || obj.Time || obj['Time Slot'] || obj['Time'];
+    const date =
+      typeof rawDate === 'string'
+        ? normalizeDateString(rawDate)
+        : normalizeDateString(String(rawDate || ''));
+    if (!date) return [];
+    return [
+      {
+        date,
+        type: typeof rawType === 'string' ? rawType : String(rawType || ''),
+        time: normalizeTimeString(rawTime)
+      }
     ];
-    for (const key of candidateKeys) {
-      const value = obj[key];
-      if (typeof value === 'string') {
-        const normalized = normalizeDateString(value);
-        if (normalized) {
-          dates.push(normalized);
-          break;
-        }
-      }
-    }
-
-    if (dates.length === 0) {
-      for (const value of Object.values(obj)) {
-        if (typeof value === 'string') {
-          const normalized = normalizeDateString(value);
-          if (normalized) {
-            dates.push(normalized);
-            break;
-          }
-        }
-      }
-    }
   }
 
-  return dates;
+  if (typeof row === 'string') {
+    const date = normalizeDateString(row);
+    return date ? [{ date, type: '', time: '' }] : [];
+  }
+
+  return [];
 };
 
-const extractBookedDates = (data: unknown): string[] => {
+const extractBookings = (data: unknown): BookingRecord[] => {
   if (!data) return [];
 
   const rows: unknown[] = [];
@@ -136,25 +142,36 @@ const extractBookedDates = (data: unknown): string[] => {
 
   if (!rows.length) return [];
 
-  const dates: string[] = [];
   const headerRow = Array.isArray(rows[0]) ? rows[0] : null;
   let startIndex = 0;
+  let dateCol = -1;
+  let programCol = -1;
+  let timeCol = -1;
 
   if (headerRow) {
     const headerStrings = headerRow.map(cell => String(cell).toLowerCase());
     if (headerStrings.some(cell => cell.includes('date'))) {
       startIndex = 1;
     }
+    dateCol = headerStrings.findIndex(cell => cell.includes('date'));
+    programCol = headerStrings.findIndex(cell =>
+      cell.includes('type of program') ||
+      cell.includes('program type') ||
+      cell.includes('program')
+    );
+    timeCol = headerStrings.findIndex(cell => cell.includes('time'));
   }
+
+  const bookings: BookingRecord[] = [];
 
   for (let i = startIndex; i < rows.length; i += 1) {
-    dates.push(...extractDatesFromRow(rows[i]));
+    bookings.push(...extractBookingsFromRow(rows[i], dateCol, programCol, timeCol));
   }
 
-  return dates;
+  return bookings;
 };
 
-export const fetchBookedDates = async (): Promise<string[]> => {
+export const fetchBookings = async (): Promise<BookingRecord[]> => {
   try {
     const response = await fetch(BOOKINGS_ENDPOINT, {
       method: 'GET',
@@ -169,10 +186,14 @@ export const fetchBookedDates = async (): Promise<string[]> => {
       json = text;
     }
 
-    const dates = extractBookedDates(json);
-    const uniqueDates = Array.from(new Set(dates)).filter(Boolean);
-    uniqueDates.sort();
-    return uniqueDates;
+    const bookings = extractBookings(json);
+    const unique = Array.from(
+      new Map(
+        bookings.map(item => [`${item.date}|${item.type}|${item.time || ''}`, item])
+      ).values()
+    );
+    unique.sort((a, b) => a.date.localeCompare(b.date));
+    return unique;
   } catch (error) {
     console.error('Error loading booked dates:', error);
     return [];

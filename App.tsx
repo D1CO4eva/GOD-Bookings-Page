@@ -6,9 +6,9 @@ import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
-import { Page, DevotionalProgram, BookingData, TimeSlot } from './types';
+import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot } from './types';
 import { PROGRAMS } from './constants';
-import { fetchBookedDates, submitToGoogleSheets } from './services/googleSheetsService';
+import { fetchBookings, submitToGoogleSheets } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
 
 const App: React.FC = () => {
@@ -18,25 +18,69 @@ const App: React.FC = () => {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDonateOpen, setIsDonateOpen] = useState(false);
+  const [donateTitle, setDonateTitle] = useState<string | undefined>();
+  const [donateMessage, setDonateMessage] = useState<string | undefined>();
   
   // Track booked dates to prevent double-booking on same day
-  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [localBookedDates, setLocalBookedDates] = useState<string[]>([]);
+  const [localBookedSlots, setLocalBookedSlots] = useState<Record<string, string[]>>({});
   const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(true);
 
-  const blockedDates = useMemo(
-    () => Array.from(new Set([...bookedDates, ...localBookedDates])),
-    [bookedDates, localBookedDates]
-  );
+  const blockedDates = useMemo(() => {
+    const serverDates = bookings
+      .filter(booking => booking.type.trim().toLowerCase() !== 'nama bhiksha')
+      .map(booking => booking.date);
+    return Array.from(new Set([...serverDates, ...localBookedDates]));
+  }, [bookings, localBookedDates]);
+
+  const namaBhikshaSlotsByDate = useMemo(() => {
+    const slots: Record<string, string[]> = {};
+
+    for (const booking of bookings) {
+      if (booking.type.trim().toLowerCase() !== 'nama bhiksha') continue;
+      if (!booking.date) continue;
+      const timeLabel = booking.time ? booking.time.trim() : '';
+      if (!timeLabel) continue;
+      slots[booking.date] = slots[booking.date] || [];
+      if (!slots[booking.date].includes(timeLabel)) {
+        slots[booking.date].push(timeLabel);
+      }
+    }
+
+    for (const [date, localTimes] of Object.entries(localBookedSlots)) {
+      slots[date] = slots[date] || [];
+      for (const timeLabel of localTimes) {
+        if (!slots[date].includes(timeLabel)) {
+          slots[date].push(timeLabel);
+        }
+      }
+    }
+
+    return slots;
+  }, [bookings, localBookedSlots]);
+
+  const namaBhikshaFullyBookedDates = useMemo(() => {
+    return Object.entries(namaBhikshaSlotsByDate)
+      .filter(([, slots]) => slots.length >= 2)
+      .map(([date]) => date);
+  }, [namaBhikshaSlotsByDate]);
+
+  const calendarBlockedDates = useMemo(() => {
+    if (selectedProgram?.id === 'nama-bhiksha') {
+      return Array.from(new Set([...blockedDates, ...namaBhikshaFullyBookedDates]));
+    }
+    return blockedDates;
+  }, [blockedDates, namaBhikshaFullyBookedDates, selectedProgram?.id]);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadBookedDates = async () => {
       try {
-        const dates = await fetchBookedDates();
+        const records = await fetchBookings();
         if (isMounted) {
-          setBookedDates(dates);
+          setBookings(records);
         }
       } finally {
         if (isMounted) {
@@ -60,6 +104,12 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleDonateOpen = (title?: string, message?: string) => {
+    setDonateTitle(title);
+    setDonateMessage(message);
+    setIsDonateOpen(true);
+  };
+
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setSelectedSlot(null);
@@ -74,6 +124,7 @@ const App: React.FC = () => {
   const handleResetBookedDates = () => {
     if (window.confirm("This will clear all blocked dates in your current browser session. Do you want to continue?")) {
       setLocalBookedDates([]);
+      setLocalBookedSlots({});
       alert("Calendar reset successful.");
     }
   };
@@ -81,24 +132,59 @@ const App: React.FC = () => {
   const handleSubmit = async (data: BookingData) => {
     setIsSubmitting(true);
     try {
-      const latestBookedDates = await fetchBookedDates();
-      setBookedDates(latestBookedDates);
+    const latestBookings = await fetchBookings();
+    setBookings(latestBookings);
 
       if (selectedDate) {
         const dateStr = selectedDate.toLocaleDateString('en-CA');
-        if (latestBookedDates.includes(dateStr)) {
+      const programId = selectedProgram?.id;
+      if (programId === 'nama-bhiksha') {
+        const bookedTimes = new Set<string>();
+        for (const booking of latestBookings || []) {
+          if (booking.type.trim().toLowerCase() !== 'nama bhiksha') continue;
+          if (booking.date !== dateStr) continue;
+          if (booking.time) bookedTimes.add(booking.time);
+        }
+        for (const timeLabel of localBookedSlots[dateStr] || []) {
+          bookedTimes.add(timeLabel);
+        }
+        if (bookedTimes.size >= 2) {
+          alert("Sorry, that date is already fully booked for Nama Bhiksha. Please choose another date.");
+          return;
+        }
+        const selectedTime = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
+        if (selectedTime && (bookedTimes.has(selectedTime) || bookedTimes.has(selectedSlot?.start || ''))) {
+          alert("Sorry, that time slot was just booked. Please choose another slot.");
+          return;
+        }
+      } else {
+        const dateTaken = latestBookings.some(
+          booking => booking.date === dateStr && booking.type.trim().toLowerCase() !== 'nama bhiksha'
+        );
+        if (dateTaken) {
           alert("Sorry, that date was just booked. Please choose another date.");
           return;
         }
       }
+    }
 
-      const success = await submitToGoogleSheets(data);
-      if (success) {
-        // Add the date to the booked list so it can't be booked again this session
-        if (selectedDate) {
-          const dateStr = selectedDate.toLocaleDateString('en-CA');
+    const success = await submitToGoogleSheets(data);
+    if (success) {
+      // Add the date to the booked list so it can't be booked again this session
+      if (selectedDate) {
+        const dateStr = selectedDate.toLocaleDateString('en-CA');
+        if (selectedProgram?.id === 'nama-bhiksha') {
+          const timeLabel = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
+          if (timeLabel) {
+            setLocalBookedSlots(prev => ({
+              ...prev,
+              [dateStr]: prev[dateStr] ? Array.from(new Set([...prev[dateStr], timeLabel])) : [timeLabel]
+            }));
+          }
+        } else {
           setLocalBookedDates(prev => (prev.includes(dateStr) ? prev : [...prev, dateStr]));
         }
+      }
         setCurrentPage(Page.SUCCESS);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
@@ -154,21 +240,62 @@ const App: React.FC = () => {
                   <div className="w-24 h-1.5 bg-[#FFCC00] mx-auto mt-6 rounded-full"></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  {PROGRAMS.map(program => (
-                    <ProgramCard 
-                      key={program.id} 
-                      program={program} 
-                      onBook={handleProgramSelect} 
+                  {PROGRAMS.slice(0, -1).map(program => (
+                    <ProgramCard
+                      key={program.id}
+                      program={program}
+                      onBook={handleProgramSelect}
+                      onDonate={(selected) =>
+                        selected.id === 'nama-bhiksha'
+                          ? handleDonateOpen()
+                          : handleDonateOpen(
+                              `Donation for ${selected.name}`,
+                              `Your contribution helps us offer ${selected.name} with love and devotion.`
+                            )
+                      }
                     />
                   ))}
                 </div>
+                {PROGRAMS.length > 0 && (
+                  <div className="mt-10 flex justify-center">
+                    <div className="w-full md:w-2/3 lg:w-1/3">
+                      <ProgramCard
+                        key={PROGRAMS[PROGRAMS.length - 1].id}
+                        program={PROGRAMS[PROGRAMS.length - 1]}
+                        onBook={handleProgramSelect}
+                        onDonate={(selected) =>
+                          selected.id === 'nama-bhiksha'
+                            ? handleDonateOpen()
+                            : handleDonateOpen(
+                                `Donation for ${selected.name}`,
+                                `Your contribution helps us offer ${selected.name} with love and devotion.`
+                              )
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           </>
         );
 
       case Page.BOOKING_CALENDAR:
-        const availableSlots = selectedDate ? generateSlots(selectedProgram!.id, selectedDate) : [];
+        const rawSlots = selectedDate ? generateSlots(selectedProgram!.id, selectedDate) : [];
+        const availableSlots =
+          selectedDate && selectedProgram?.id === 'nama-bhiksha'
+            ? (() => {
+                const dateStr = selectedDate.toLocaleDateString('en-CA');
+                if (namaBhikshaFullyBookedDates.includes(dateStr)) {
+                  return [];
+                }
+                const bookedTimes = new Set(namaBhikshaSlotsByDate[dateStr] || []);
+                return rawSlots.filter(slot => {
+                  const slotLabel = `${slot.start} - ${slot.end}`;
+                  return !(bookedTimes.has(slotLabel) || bookedTimes.has(slot.start));
+                });
+              })()
+            : rawSlots;
         const periods: Array<'Morning' | 'Evening'> = ['Morning', 'Evening'];
         const durationOrder = ['30 Minutes', '1 Hour', '1.5 Hours', '2 Hours', '3 Hours'];
 
@@ -191,7 +318,7 @@ const App: React.FC = () => {
                       programId={selectedProgram!.id} 
                       onSelectDate={handleDateSelect}
                       selectedDate={selectedDate}
-                      bookedDates={blockedDates}
+                      bookedDates={calendarBlockedDates}
                     />
                   </div>
                 </div>
@@ -307,7 +434,7 @@ const App: React.FC = () => {
                 </p>
                 <p className="font-bold text-[#2E3192]">
                   Email: atlantanamadwaar@gmail.com<br />
-                  Phone: 6784278530
+                  Phone: 404-788-7391
                 </p>
                 <p className="italic">
                   We look forward to bringing Sri Madhurisakhi Sametha Premikavardan's blessings to your Home!
@@ -400,12 +527,14 @@ const App: React.FC = () => {
       <Header 
         onNavigate={setCurrentPage} 
         currentPage={currentPage} 
-        onOpenDonate={() => setIsDonateOpen(true)}
+        onOpenDonate={() => handleDonateOpen()}
       />
       <main className="flex-grow">{renderContent()}</main>
       <DonateModal 
         isOpen={isDonateOpen} 
         onClose={() => setIsDonateOpen(false)} 
+        title={donateTitle}
+        message={donateMessage}
       />
       <Footer />
     </div>

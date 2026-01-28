@@ -4,9 +4,10 @@ import { DevotionalProgram } from '../types';
 interface ProgramCardProps {
   program: DevotionalProgram;
   onBook: (program: DevotionalProgram) => void;
+  onDonate?: (program: DevotionalProgram) => void;
 }
 
-const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook }) => {
+const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate }) => {
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col h-full transform hover:-translate-y-1">
       {program.imageUrl && (
@@ -31,14 +32,32 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook }) => {
         <p className="text-gray-600 mb-6 leading-relaxed italic">"{program.description}"</p>
         
         {program.donationAmount && (
-          <div className="mb-5 flex items-center bg-[#2E3192]/5 px-4 py-3 rounded-xl border border-[#2E3192]/10">
-            <div className="w-8 h-8 rounded-full bg-[#2E3192] text-white flex items-center justify-center mr-3 shrink-0">
-               <i className="fas fa-hand-holding-heart text-xs"></i>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-gray-400 leading-none mb-1">Donation Amount</p>
-              <p className="text-xl font-bold text-[#2E3192]">{program.donationAmount}</p>
-            </div>
+          <div className="mb-5">
+            {onDonate ? (
+              <button
+                type="button"
+                onClick={() => onDonate(program)}
+                className="w-full flex items-center bg-[#2E3192]/5 px-4 py-3 rounded-xl border border-[#2E3192]/10 hover:bg-[#2E3192] hover:text-white transition-all shadow-sm group"
+              >
+                <div className="w-8 h-8 rounded-full bg-[#2E3192] text-white flex items-center justify-center mr-3 shrink-0 group-hover:bg-white group-hover:text-[#2E3192] transition-colors">
+                  <i className="fas fa-hand-holding-heart text-xs"></i>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] uppercase font-bold text-gray-400 leading-none mb-1 group-hover:text-white/80">Donation Amount</p>
+                  <p className="text-xl font-bold text-[#2E3192] group-hover:text-white">{program.donationAmount}</p>
+                </div>
+              </button>
+            ) : (
+              <div className="flex items-center bg-[#2E3192]/5 px-4 py-3 rounded-xl border border-[#2E3192]/10">
+                <div className="w-8 h-8 rounded-full bg-[#2E3192] text-white flex items-center justify-center mr-3 shrink-0">
+                  <i className="fas fa-hand-holding-heart text-xs"></i>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-gray-400 leading-none mb-1">Donation Amount</p>
+                  <p className="text-xl font-bold text-[#2E3192]">{program.donationAmount}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
