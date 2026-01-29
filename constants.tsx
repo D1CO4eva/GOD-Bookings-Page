@@ -16,7 +16,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'radha-kalyanam',
     name: 'Radha Kalyanam',
-    description: 'A devotional ceremony celebrating the divine marriage of Radha and Krishna with bhajans and prayers.',
+    description: 'Sri Radha and Krishna, accompanied by Atlanta Namadwaar Bhagavathas, celebrate their divine marrriage in a devotional ceremony that\'s filled with bhajans and prayers!',
     duration: '3 Hours',
     icon: 'fa-hands-praying',
     videoUrl: 'https://youtube.com/shorts/C2lnjuv50Zw?si=-1eiWMtvjzvxEYre',
@@ -26,7 +26,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nikunja-utsavam',
     name: 'Nikunja Utsavam',
-    description: 'A program focused on lovingly serving the Divine Couple in the spirit of Nikunja seva through nama and bhakti.',
+    description: 'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at it\'s peak!',
     duration: '2 Hours',
     icon: 'fa-sun',
     donationAmount: '$301',
@@ -35,7 +35,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'thirumanjanam',
     name: 'Thirumanjanam',
-    description: 'Holy bath for Sri Radha and Krishna at your home residence.',
+    description: 'Experience the divine Abhishek of Sri Radha and Krishna right in your home with Veda Parayanam, Bhajans, and Mahamantra Kirtan!',
     duration: '2 Hours',
     icon: 'fa-water',
     donationAmount: '$301',
@@ -44,7 +44,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nama-ruchi',
     name: 'Nama Ruchi',
-    description: 'A satsang designed to build taste (ruchi) for the Holy Name through kirtan, reflection, and association.',
+    description: 'Invite Sri Radha and Krishna to your home for an exhiliarating session of Mahamantra Kirtan!',
     duration: '1 Hour',
     icon: 'fa-music',
     videoUrl: 'https://youtube.com/shorts/qBFfZkudf-4?si=7nb9eUqYKdVZlNmW',
@@ -54,7 +54,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nama-bhiksha',
     name: 'Nama Bhiksha',
-    description: 'A simple and heartfelt gathering centered on chanting and sharing prasadam in the mood of humility and devotion.',
+    description: 'Atlanta Bhagavathas come to your home and chant Mahamantra for you and your family\'s welfare!',
     duration: '30 min - 1 Hour',
     icon: 'fa-heart',
     donationAmount: 'Any amount appreciated',

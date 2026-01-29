@@ -27,11 +27,43 @@ const App: React.FC = () => {
   const [localBookedSlots, setLocalBookedSlots] = useState<Record<string, string[]>>({});
   const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(true);
 
+  const normalizeProgramType = (value: string) => value.trim().toLowerCase();
+
+  const satsangDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const booking of bookings) {
+      if (!booking.date) continue;
+      if (normalizeProgramType(booking.type) === 'satsang') {
+        dates.add(booking.date);
+      }
+    }
+    return Array.from(dates);
+  }, [bookings]);
+
   const blockedDates = useMemo(() => {
-    const serverDates = bookings
-      .filter(booking => booking.type.trim().toLowerCase() !== 'nama bhiksha')
-      .map(booking => booking.date);
-    return Array.from(new Set([...serverDates, ...localBookedDates]));
+    const dates = new Set<string>();
+
+    for (const booking of bookings) {
+      if (!booking.date) continue;
+      const programType = normalizeProgramType(booking.type);
+
+      if (programType === 'nama bhiksha') {
+        continue;
+      }
+      if (programType === 'satsang') {
+        // Only blocks evening slots, handled separately.
+        continue;
+      }
+
+      // All other programs (including special events) block the whole date.
+      dates.add(booking.date);
+    }
+
+    for (const date of localBookedDates) {
+      dates.add(date);
+    }
+
+    return Array.from(dates);
   }, [bookings, localBookedDates]);
 
   const namaBhikshaSlotsByDate = useMemo(() => {
@@ -139,6 +171,13 @@ const App: React.FC = () => {
         const dateStr = selectedDate.toLocaleDateString('en-CA');
       const programId = selectedProgram?.id;
       if (programId === 'nama-bhiksha') {
+        const hasSatsang = latestBookings.some(
+          booking => booking.date === dateStr && normalizeProgramType(booking.type) === 'satsang'
+        );
+        if (hasSatsang) {
+          alert("Sorry, evening slots are unavailable on this date due to a Satsang booking.");
+          return;
+        }
         const bookedTimes = new Set<string>();
         for (const booking of latestBookings || []) {
           if (booking.type.trim().toLowerCase() !== 'nama bhiksha') continue;
@@ -158,9 +197,15 @@ const App: React.FC = () => {
           return;
         }
       } else {
-        const dateTaken = latestBookings.some(
-          booking => booking.date === dateStr && booking.type.trim().toLowerCase() !== 'nama bhiksha'
-        );
+        const dateTaken = latestBookings.some(booking => {
+          if (booking.date !== dateStr) return false;
+          const programType = normalizeProgramType(booking.type);
+          if (programType === 'nama bhiksha') return false;
+          if (programType === 'satsang') {
+            return selectedSlot?.period === 'Evening';
+          }
+          return true;
+        });
         if (dateTaken) {
           alert("Sorry, that date was just booked. Please choose another date.");
           return;
@@ -282,6 +327,11 @@ const App: React.FC = () => {
 
       case Page.BOOKING_CALENDAR:
         const rawSlots = selectedDate ? generateSlots(selectedProgram!.id, selectedDate) : [];
+        const satsangDateStr = selectedDate ? selectedDate.toLocaleDateString('en-CA') : '';
+        const hasSatsang = satsangDateStr ? satsangDates.includes(satsangDateStr) : false;
+        const slotsAfterSatsang = hasSatsang
+          ? rawSlots.filter(slot => slot.period !== 'Evening')
+          : rawSlots;
         const availableSlots =
           selectedDate && selectedProgram?.id === 'nama-bhiksha'
             ? (() => {
@@ -290,12 +340,12 @@ const App: React.FC = () => {
                   return [];
                 }
                 const bookedTimes = new Set(namaBhikshaSlotsByDate[dateStr] || []);
-                return rawSlots.filter(slot => {
+                return slotsAfterSatsang.filter(slot => {
                   const slotLabel = `${slot.start} - ${slot.end}`;
                   return !(bookedTimes.has(slotLabel) || bookedTimes.has(slot.start));
                 });
               })()
-            : rawSlots;
+            : slotsAfterSatsang;
         const periods: Array<'Morning' | 'Evening'> = ['Morning', 'Evening'];
         const durationOrder = ['30 Minutes', '1 Hour', '1.5 Hours', '2 Hours', '3 Hours'];
 
