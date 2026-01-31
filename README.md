@@ -1,20 +1,37 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+﻿# Atlanta Namadwaar Home Program Booking
 
-# Run and deploy your AI Studio app
+A welcoming booking experience for Atlanta Namadwaar devotional home programs. Visitors can explore programs, choose an available date and time, and submit a request in just a few steps.
 
-This contains everything you need to run your app locally.
+## App Flow
 
-View your app in AI Studio: https://ai.studio/apps/drive/1POxzb5t43mRYkjOStAVUXcq3tN2FkTFW
+1. **Browse programs** on the home page, including images and brief descriptions.
+2. **Select a program** to open the booking calendar.
+3. **Choose a date and time slot** based on availability.
+4. **Enter contact details** and submit the request.
+5. **Receive confirmation** with next‑step contact information.
 
-## Run Locally
+## Programs Offered
 
-**Prerequisites:**  Node.js
+- Radha Kalyanam
+- Nikunja Utsavam
+- Thirumanjanam
+- Nama Ruchi
+- Nama Bhiksha
 
+## Booking Behavior
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- The calendar is set to **2026** in the UI.
+- Past dates and already‑booked dates are disabled.
+- Radha Kalyanam, Nikunja Utsavam, and Thirumanjanam are **weekend‑only**.
+- Nama Ruchi is available on **Fridays and weekends**.
+- Nama Bhiksha is available **any day**, with **up to two bookings per date**.
+- If a **Satsang** booking exists for a date, **Nama Bhiksha evening slots** are blocked.
+
+## Donation Experience
+
+- Each program shows a suggested donation.
+- A donation modal provides quick access to the Zelle email and easy copy‑to‑clipboard.
+
+## Session Reset
+
+A reset option clears only the locally blocked dates in the current browser session (useful for testing or quick adjustments).
