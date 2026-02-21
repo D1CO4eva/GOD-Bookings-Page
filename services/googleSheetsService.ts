@@ -1,7 +1,10 @@
 
 import { BookingData, BookingRecord } from '../types';
 
-const API_BASE = '';
+const normalizeApiBase = (value: string) => value.replace(/\/+$/, '');
+const API_BASE = normalizeApiBase(
+  import.meta.env.VITE_API_BASE || 'https://god-auth-service-693007788010.us-central1.run.app'
+);
 const BOOKINGS_ENDPOINT = `${API_BASE}/api/bookings`;
 
 export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> => {
@@ -18,7 +21,7 @@ export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> 
       'Additional Notes': data.additionalNotes
     };
 
-    await fetch(BOOKINGS_ENDPOINT, {
+    const response = await fetch(BOOKINGS_ENDPOINT, {
       method: 'POST',
       cache: 'no-cache',
       headers: {
@@ -27,7 +30,7 @@ export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> 
       body: JSON.stringify(payload),
     });
 
-    return true;
+    return response.ok;
   } catch (error) {
     console.error('Error submitting booking:', error);
     return false;
@@ -95,11 +98,27 @@ const extractBookingsFromRow = (
     const rawDate =
       obj.date ||
       obj.Date ||
+      obj.programDate ||
+      obj.program_date ||
       obj['Program Date'] ||
       obj['Date of Program'] ||
       obj['Date of Program (YYYY-MM-DD)'];
-    const rawType = obj.type || obj.Type || obj['Type of Program'] || obj.program || obj.Program;
-    const rawTime = obj.time || obj.Time || obj['Time Slot'] || obj['Time'];
+    const rawType =
+      obj.type ||
+      obj.Type ||
+      obj.programType ||
+      obj.program_type ||
+      obj['Type of Program'] ||
+      obj['Program Type'] ||
+      obj.program ||
+      obj.Program;
+    const rawTime =
+      obj.time ||
+      obj.Time ||
+      obj.programTime ||
+      obj.program_time ||
+      obj['Time Slot'] ||
+      obj['Time'];
     const date =
       typeof rawDate === 'string'
         ? normalizeDateString(rawDate)

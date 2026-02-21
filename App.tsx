@@ -6,10 +6,20 @@ import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
+import EventPopupModal from './components/EventPopupModal';
 import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot } from './types';
 import { PROGRAMS } from './constants';
 import { fetchBookings, submitToGoogleSheets } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
+
+const KNOWN_PROGRAM_TYPES = new Set([
+  'radha kalyanam',
+  'nikunja utsavam',
+  'thirumanjanam',
+  'nama ruchi',
+  'nama bhiksha',
+  'satsang'
+]);
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
@@ -18,6 +28,8 @@ const App: React.FC = () => {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDonateOpen, setIsDonateOpen] = useState(false);
+  const [isEventPopupOpen, setIsEventPopupOpen] = useState(false);
+  const [eventPopupStartInFullView, setEventPopupStartInFullView] = useState(false);
   const [donateTitle, setDonateTitle] = useState<string | undefined>();
   const [donateMessage, setDonateMessage] = useState<string | undefined>();
   
@@ -28,12 +40,18 @@ const App: React.FC = () => {
   const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(true);
 
   const normalizeProgramType = (value: string) => value.trim().toLowerCase();
+  const isSatsangType = (value: string) => normalizeProgramType(value) === 'satsang';
+  const isNamaBhikshaType = (value: string) => normalizeProgramType(value) === 'nama bhiksha';
+  const isSpecialProgramType = (value: string) => {
+    const normalized = normalizeProgramType(value);
+    return normalized.length > 0 && !KNOWN_PROGRAM_TYPES.has(normalized);
+  };
 
   const satsangDates = useMemo(() => {
     const dates = new Set<string>();
     for (const booking of bookings) {
       if (!booking.date) continue;
-      if (normalizeProgramType(booking.type) === 'satsang') {
+      if (isSatsangType(booking.type)) {
         dates.add(booking.date);
       }
     }
@@ -45,17 +63,16 @@ const App: React.FC = () => {
 
     for (const booking of bookings) {
       if (!booking.date) continue;
-      const programType = normalizeProgramType(booking.type);
-
-      if (programType === 'nama bhiksha') {
+      if (isNamaBhikshaType(booking.type)) {
         continue;
       }
-      if (programType === 'satsang') {
+      if (isSatsangType(booking.type)) {
         // Only blocks evening slots, handled separately.
         continue;
       }
 
-      // All other programs (including special events) block the whole date.
+      // All non-Satsang / non-Nama Bhiksha programs block the full day.
+      // This includes standard programs and any "special" program types.
       dates.add(booking.date);
     }
 
@@ -70,7 +87,7 @@ const App: React.FC = () => {
     const slots: Record<string, string[]> = {};
 
     for (const booking of bookings) {
-      if (booking.type.trim().toLowerCase() !== 'nama bhiksha') continue;
+      if (!isNamaBhikshaType(booking.type)) continue;
       if (!booking.date) continue;
       const timeLabel = booking.time ? booking.time.trim() : '';
       if (!timeLabel) continue;
@@ -128,6 +145,17 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setEventPopupStartInFullView(false);
+      setIsEventPopupOpen(true);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
   const handleProgramSelect = (program: DevotionalProgram) => {
     setSelectedProgram(program);
     setSelectedDate(null);
@@ -164,58 +192,62 @@ const App: React.FC = () => {
   const handleSubmit = async (data: BookingData) => {
     setIsSubmitting(true);
     try {
-    const latestBookings = await fetchBookings();
-    setBookings(latestBookings);
+      const latestBookings = bookings;
 
       if (selectedDate) {
         const dateStr = selectedDate.toLocaleDateString('en-CA');
-      const programId = selectedProgram?.id;
-      if (programId === 'nama-bhiksha') {
-        const hasSatsang = latestBookings.some(
-          booking => booking.date === dateStr && normalizeProgramType(booking.type) === 'satsang'
-        );
-        if (hasSatsang) {
-          alert("Sorry, evening slots are unavailable on this date due to a Satsang booking.");
-          return;
-        }
-        const bookedTimes = new Set<string>();
-        for (const booking of latestBookings || []) {
-          if (booking.type.trim().toLowerCase() !== 'nama bhiksha') continue;
-          if (booking.date !== dateStr) continue;
-          if (booking.time) bookedTimes.add(booking.time);
-        }
-        for (const timeLabel of localBookedSlots[dateStr] || []) {
-          bookedTimes.add(timeLabel);
-        }
-        if (bookedTimes.size >= 2) {
-          alert("Sorry, that date is already fully booked for Nama Bhiksha. Please choose another date.");
-          return;
-        }
-        const selectedTime = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
-        if (selectedTime && (bookedTimes.has(selectedTime) || bookedTimes.has(selectedSlot?.start || ''))) {
-          alert("Sorry, that time slot was just booked. Please choose another slot.");
-          return;
-        }
-      } else {
-        const dateTaken = latestBookings.some(booking => {
-          if (booking.date !== dateStr) return false;
-          const programType = normalizeProgramType(booking.type);
-          if (programType === 'nama bhiksha') return false;
-          if (programType === 'satsang') {
-            return selectedSlot?.period === 'Evening';
+        const programId = selectedProgram?.id;
+        if (programId === 'nama-bhiksha') {
+          const hasSatsang = latestBookings.some(
+            booking => booking.date === dateStr && isSatsangType(booking.type)
+          );
+          if (hasSatsang) {
+            alert("Sorry, evening slots are unavailable on this date due to a Satsang booking.");
+            return;
           }
-          return true;
-        });
-        if (dateTaken) {
-          alert("Sorry, that date was just booked. Please choose another date.");
-          return;
+          const bookedTimes = new Set<string>();
+          for (const booking of latestBookings || []) {
+            if (!isNamaBhikshaType(booking.type)) continue;
+            if (booking.date !== dateStr) continue;
+            if (booking.time) bookedTimes.add(booking.time);
+          }
+          for (const timeLabel of localBookedSlots[dateStr] || []) {
+            bookedTimes.add(timeLabel);
+          }
+          if (bookedTimes.size >= 2) {
+            alert("Sorry, that date is already fully booked for Nama Bhiksha. Please choose another date.");
+            return;
+          }
+          const selectedTime = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
+          if (selectedTime && (bookedTimes.has(selectedTime) || bookedTimes.has(selectedSlot?.start || ''))) {
+            alert("Sorry, that time slot was just booked. Please choose another slot.");
+            return;
+          }
+        } else {
+          const dateTaken = latestBookings.some(booking => {
+            if (booking.date !== dateStr) return false;
+            if (isNamaBhikshaType(booking.type)) return false;
+            if (isSatsangType(booking.type)) {
+              return selectedSlot?.period === 'Evening';
+            }
+            if (isSpecialProgramType(booking.type)) {
+              return true;
+            }
+            return true;
+          });
+          if (dateTaken) {
+            alert("Sorry, that date was just booked. Please choose another date.");
+            return;
+          }
         }
       }
-    }
 
-    const success = await submitToGoogleSheets(data);
-    if (success) {
-      // Add the date to the booked list so it can't be booked again this session
+      const submitPromise = submitToGoogleSheets(data);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 2000);
+      });
+
+      // Optimistically block the selected date/slot in this browser immediately.
       if (selectedDate) {
         const dateStr = selectedDate.toLocaleDateString('en-CA');
         if (selectedProgram?.id === 'nama-bhiksha') {
@@ -230,11 +262,27 @@ const App: React.FC = () => {
           setLocalBookedDates(prev => (prev.includes(dateStr) ? prev : [...prev, dateStr]));
         }
       }
-        setCurrentPage(Page.SUCCESS);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        alert("Submission failed. Please check your internet connection or verify the Google Script URL.");
-      }
+
+      setCurrentPage(Page.SUCCESS);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      void submitPromise
+        .then((success) => {
+          if (!success) {
+            console.error('Submission failed after optimistic success transition.');
+            return;
+          }
+          void fetchBookings()
+            .then((records) => {
+              setBookings(records);
+            })
+            .catch((error) => {
+              console.error('Error refreshing bookings after submit:', error);
+            });
+        })
+        .catch((error) => {
+          console.error('Submission error after optimistic success transition:', error);
+        });
     } finally {
       setIsSubmitting(false);
     }
@@ -273,6 +321,17 @@ const App: React.FC = () => {
                     >
                       <i className="fas fa-heart"></i>
                       <span>Donate Here</span>
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => {
+                        setEventPopupStartInFullView(true);
+                        setIsEventPopupOpen(true);
+                      }}
+                      className="w-full sm:w-auto bg-white/10 text-white border-2 border-white/30 px-8 py-3 rounded-full font-semibold text-base hover:bg-white hover:text-[#2E3192] transition-all shadow-md active:scale-95"
+                    >
+                      View Fundraiser Event
                     </button>
                   </div>
                </div>
@@ -585,6 +644,14 @@ const App: React.FC = () => {
         onClose={() => setIsDonateOpen(false)} 
         title={donateTitle}
         message={donateMessage}
+      />
+      <EventPopupModal
+        isOpen={isEventPopupOpen}
+        openInFullView={eventPopupStartInFullView}
+        onClose={() => {
+          setIsEventPopupOpen(false);
+          setEventPopupStartInFullView(false);
+        }}
       />
       <Footer />
     </div>

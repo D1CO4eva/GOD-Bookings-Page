@@ -2,6 +2,8 @@
 
 A welcoming booking experience for Atlanta Namadwaar devotional home programs. Visitors can explore programs, choose an available date and time, and submit a request in just a few steps.
 
+Live site: https://atlanta.godivinity.org
+
 ## App Flow
 
 1. **Browse programs** on the home page, including images and brief descriptions.

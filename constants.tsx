@@ -21,7 +21,11 @@ export const PROGRAMS: DevotionalProgram[] = [
     icon: 'fa-hands-praying',
     videoUrl: 'https://youtube.com/shorts/C2lnjuv50Zw?si=-1eiWMtvjzvxEYre',
     donationAmount: '$501',
-    imageUrl: 'https://godivinity.org/wp-content/uploads/2025/01/c962aa6f-fc42-4323-94c0-832632e88e7a.jpeg'
+    imageUrl: 'https://godivinity.org/wp-content/uploads/2025/01/c962aa6f-fc42-4323-94c0-832632e88e7a.jpeg',
+    checklist: {
+      label: 'Program Checklist',
+      href: '/program-checklists/radha-kalyanam-checklist.docx'
+    }
   },
   {
     id: 'nikunja-utsavam',
@@ -29,8 +33,12 @@ export const PROGRAMS: DevotionalProgram[] = [
     description: 'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at it\'s peak!',
     duration: '2 Hours',
     icon: 'fa-sun',
-    donationAmount: '$301',
-    imageUrl: 'https://godivinity.org/wp-content/uploads/2021/08/WhatsApp-Image-2021-08-28-at-3.13.27-PM.jpeg'
+    donationAmount: '$401',
+    imageUrl: '/program-images/nikunja-utsavam/nikunja-utsavam.jpg',
+    checklist: {
+      label: 'Program Checklist',
+      href: '/program-checklists/nikunja-utsavam-checklist.docx'
+    }
   },
   {
     id: 'thirumanjanam',
@@ -38,8 +46,12 @@ export const PROGRAMS: DevotionalProgram[] = [
     description: 'Experience the divine Abhishek of Sri Radha and Krishna right in your home with Veda Parayanam, Bhajans, and Mahamantra Kirtan!',
     duration: '2 Hours',
     icon: 'fa-water',
-    donationAmount: '$301',
-    imageUrl: 'https://godivinity.org/wp-content/uploads/2022/03/WhatsApp-Image-2022-03-28-at-8.57.40-PM.jpeg'
+    donationAmount: '$351',
+    imageUrl: 'https://godivinity.org/wp-content/uploads/2022/03/WhatsApp-Image-2022-03-28-at-8.57.40-PM.jpeg',
+    checklist: {
+      label: 'Program Checklist',
+      href: '/program-checklists/thirumanjanam-checklist.docx'
+    }
   },
   {
     id: 'nama-ruchi',
@@ -49,7 +61,7 @@ export const PROGRAMS: DevotionalProgram[] = [
     icon: 'fa-music',
     videoUrl: 'https://youtube.com/shorts/qBFfZkudf-4?si=7nb9eUqYKdVZlNmW',
     donationAmount: '$201',
-    imageUrl: 'https://godivinity.org/wp-content/uploads/2022/08/WhatsApp-Image-2022-08-26-at-7.41.51-AM-1.jpeg'
+    imageUrl: '/program-images/nama-ruchi/nama-ruchi.jpg'
   },
   {
     id: 'nama-bhiksha',

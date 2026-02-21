@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DevotionalProgram } from '../types';
+import { PROGRAM_IMAGE_MANIFEST } from '../generated/programImageManifest';
 
 interface ProgramCardProps {
   program: DevotionalProgram;
@@ -8,14 +9,55 @@ interface ProgramCardProps {
 }
 
 const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate }) => {
+  const imageUrls = useMemo(() => {
+    const folderImages = PROGRAM_IMAGE_MANIFEST[program.id] || [];
+    if (folderImages.length > 0) {
+      return folderImages;
+    }
+    return program.imageUrl ? [program.imageUrl] : [];
+  }, [program.id, program.imageUrl]);
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [program.id, imageUrls.length]);
+
+  useEffect(() => {
+    if (imageUrls.length <= 1) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
+    }, 2000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [imageUrls]);
+
+  const openChecklistPreview = (href: string) => {
+    const absoluteUrl = new URL(href, window.location.origin).toString();
+    const ext = href.split('.').pop()?.toLowerCase();
+
+    // Use a web document viewer for Office files so preview opens in-browser.
+    const previewUrl =
+      ext === 'doc' || ext === 'docx'
+        ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteUrl)}`
+        : absoluteUrl;
+
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col h-full transform hover:-translate-y-1">
-      {program.imageUrl && (
+    <div className="group/card bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col h-full transform hover:-translate-y-1">
+      {imageUrls.length > 0 && (
         <div className="h-48 w-full overflow-hidden">
           <img 
-            src={program.imageUrl} 
-            alt={program.name} 
-            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+            src={imageUrls[currentImageIndex]}
+            alt={program.name}
+            className="w-full h-full object-cover transform group-hover/card:scale-110 transition-transform duration-500"
           />
         </div>
       )}
@@ -58,6 +100,39 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate }) 
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {program.checklist && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between bg-amber-50 px-4 py-3 rounded-xl border border-amber-200">
+              <span className="text-sm font-bold text-amber-900">
+                {program.checklist.label || 'Program Checklist'}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    openChecklistPreview(program.checklist!.href);
+                  }}
+                  title="View checklist"
+                  aria-label={`View ${program.name} checklist`}
+                  className="w-8 h-8 rounded-full bg-white border border-amber-300 text-amber-900 flex items-center justify-center hover:bg-amber-100 transition-colors"
+                >
+                  <i className="fas fa-eye text-xs"></i>
+                </a>
+                <a
+                  href={program.checklist.href}
+                  download
+                  title="Download checklist"
+                  aria-label={`Download ${program.name} checklist`}
+                  className="w-8 h-8 rounded-full bg-white border border-amber-300 text-amber-900 flex items-center justify-center hover:bg-amber-100 transition-colors"
+                >
+                  <i className="fas fa-download text-xs"></i>
+                </a>
+              </div>
+            </div>
           </div>
         )}
 

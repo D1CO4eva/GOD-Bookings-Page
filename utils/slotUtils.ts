@@ -4,6 +4,7 @@ import { TimeSlot } from '../types';
 export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
   const day = date.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
   const isWeekend = day === 0 || day === 6;
+  const isSunday = day === 0;
   const isFriday = day === 5;
   const slots: TimeSlot[] = [];
 
@@ -25,18 +26,18 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
   };
 
   if (programId === 'radha-kalyanam') {
-    if (isWeekend) {
+    if (isSunday) {
       addSlot(10, 0, 13, 0, '3 Hours');
       addSlot(16, 0, 19, 0, '3 Hours');
     }
   } else if (programId === 'thirumanjanam') {
-    if (isWeekend) {
+    if (isSunday) {
       addSlot(10, 0, 12, 0, '2 Hours');
       addSlot(10, 15, 12, 15, '2 Hours');
       addSlot(10, 30, 12, 30, '2 Hours');
     }
   } else if (programId === 'nikunja-utsavam') {
-    if (isWeekend) {
+    if (isSunday) {
       // Morning window: 10:00 - 12:30
       // 1.5h slots
       addSlot(10, 0, 11, 30, '1.5 Hours');
@@ -135,7 +136,7 @@ export const isDateSelectable = (programId: string, date: Date, bookedDates: str
 
   const day = date.getDay();
   if (programId === 'radha-kalyanam' || programId === 'nikunja-utsavam' || programId === 'thirumanjanam') {
-    return day === 0 || day === 6;
+    return day === 0;
   }
   if (programId === 'nama-ruchi') {
     return day === 0 || day === 6 || day === 5;

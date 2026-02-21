@@ -7,6 +7,12 @@ export interface DevotionalProgram {
   videoUrl?: string;
   donationAmount?: string;
   imageUrl?: string;
+  checklist?: ProgramChecklist;
+}
+
+export interface ProgramChecklist {
+  label?: string;
+  href: string;
 }
 
 export enum Page {

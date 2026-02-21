@@ -82,9 +82,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
       </div>
 
       <div className="bg-gray-50 p-4 border-t border-gray-100 flex items-center justify-center space-x-4 text-[10px] md:text-xs">
-         <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#2E3192] mr-1"></span> Selected</div>
-         <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-gray-200 mr-1"></span> Available</div>
-         <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-gray-50 border border-gray-100 opacity-50 mr-1"></span> Passed/Booked</div>
+         <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#2E3192] mr-1"></span> Available</div>
+         <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-gray-200 mr-1"></span> Booked</div>
       </div>
     </div>
   );
