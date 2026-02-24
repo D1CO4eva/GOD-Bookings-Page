@@ -20,7 +20,11 @@ export enum Page {
   BOOKING_CALENDAR = 'booking_calendar',
   BOOKING_FORM = 'booking_form',
   SUCCESS = 'success',
-  INSTRUCTIONS = 'instructions'
+  INSTRUCTIONS = 'instructions',
+  RESERVATION_OPTIONS = 'reservation_options',
+  RESERVATION_LOOKUP = 'reservation_lookup',
+  RESERVATION_EDIT = 'reservation_edit',
+  RESERVATION_RESULT = 'reservation_result'
 }
 
 export interface TimeSlot {
@@ -50,6 +54,21 @@ export interface BookingRecord {
   date: string;
   type: string;
   time?: string;
+  email?: string;
+  confirmationNumber?: string;
+  occasion?: string;
+}
+
+export interface ReservationLookupData {
+  programType: string;
+  date: string;
+  time?: string;
+  email: string;
+  confirmationNumber: string;
+}
+export interface ReservationDetails extends ReservationLookupData {
+  time: string;
+  occasion?: string;
 }
 
 export interface FormErrors {

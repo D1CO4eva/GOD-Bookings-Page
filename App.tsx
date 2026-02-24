@@ -7,9 +7,9 @@ import BookingForm from './components/BookingForm';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
 import EventPopupModal from './components/EventPopupModal';
-import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot } from './types';
+import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot, ReservationLookupData, ReservationDetails } from './types';
 import { PROGRAMS } from './constants';
-import { fetchBookings, submitToGoogleSheets } from './services/googleSheetsService';
+import { fetchBookings, submitToGoogleSheets, verifyReservation, updateReservation, cancelReservation } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
 
 const KNOWN_PROGRAM_TYPES = new Set([
@@ -38,6 +38,18 @@ const App: React.FC = () => {
   const [localBookedDates, setLocalBookedDates] = useState<string[]>([]);
   const [localBookedSlots, setLocalBookedSlots] = useState<Record<string, string[]>>({});
   const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(true);
+  const [reservationMode, setReservationMode] = useState<'edit' | 'cancel' | null>(null);
+  const [reservationLookupDate, setReservationLookupDate] = useState('');
+  const [reservationLookupTime, setReservationLookupTime] = useState('');
+  const [reservationLookupEmail, setReservationLookupEmail] = useState('');
+  const [reservationLookupConfirmationNumber, setReservationLookupConfirmationNumber] = useState('');
+  const [reservationLookupError, setReservationLookupError] = useState('');
+  const [isReservationLookupLoading, setIsReservationLookupLoading] = useState(false);
+  const [verifiedReservation, setVerifiedReservation] = useState<ReservationDetails | null>(null);
+  const [reservationEditDate, setReservationEditDate] = useState<Date | null>(null);
+  const [reservationEditTime, setReservationEditTime] = useState('');
+  const [isReservationSubmitting, setIsReservationSubmitting] = useState(false);
+  const [reservationResultMessage, setReservationResultMessage] = useState('');
 
   const normalizeProgramType = (value: string) => value.trim().toLowerCase();
   const isSatsangType = (value: string) => normalizeProgramType(value) === 'satsang';
@@ -46,6 +58,8 @@ const App: React.FC = () => {
     const normalized = normalizeProgramType(value);
     return normalized.length > 0 && !KNOWN_PROGRAM_TYPES.has(normalized);
   };
+  const normalizeEmailForMatch = (value: string) => value.trim().toLowerCase();
+  const normalizeConfirmationForMatch = (value: string) => value.trim().toLowerCase();
 
   const satsangDates = useMemo(() => {
     const dates = new Set<string>();
@@ -122,6 +136,161 @@ const App: React.FC = () => {
     return blockedDates;
   }, [blockedDates, namaBhikshaFullyBookedDates, selectedProgram?.id]);
 
+  const bookingsWithoutCurrentReservation = useMemo(() => {
+    if (!verifiedReservation) return bookings;
+
+    const normalizedProgram = normalizeProgramType(verifiedReservation.programType);
+    const normalizedDate = verifiedReservation.date;
+    const normalizedEmail = normalizeEmailForMatch(verifiedReservation.email || '');
+    const normalizedConfirmation = normalizeConfirmationForMatch(
+      verifiedReservation.confirmationNumber || ''
+    );
+
+    const indexToRemove = bookings.findIndex((booking) => {
+      const bookingProgram = normalizeProgramType(booking.type);
+      const bookingDate = booking.date;
+      const bookingEmail = normalizeEmailForMatch(booking.email || '');
+      const bookingConfirmation = normalizeConfirmationForMatch(booking.confirmationNumber || '');
+
+      if (bookingProgram !== normalizedProgram) return false;
+      if (bookingDate !== normalizedDate) return false;
+      if (bookingEmail !== normalizedEmail) return false;
+      return bookingConfirmation === normalizedConfirmation;
+    });
+
+    if (indexToRemove < 0) return bookings;
+    return bookings.filter((_, index) => index !== indexToRemove);
+  }, [bookings, verifiedReservation]);
+
+  const reservationBlockedDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const booking of bookingsWithoutCurrentReservation) {
+      if (!booking.date) continue;
+      if (isNamaBhikshaType(booking.type)) continue;
+      if (isSatsangType(booking.type)) continue;
+      dates.add(booking.date);
+    }
+    for (const date of localBookedDates) {
+      dates.add(date);
+    }
+    return Array.from(dates);
+  }, [bookingsWithoutCurrentReservation, localBookedDates]);
+
+  const reservationNamaBhikshaSlotsByDate = useMemo(() => {
+    const slots: Record<string, string[]> = {};
+
+    for (const booking of bookingsWithoutCurrentReservation) {
+      if (!isNamaBhikshaType(booking.type)) continue;
+      if (!booking.date) continue;
+      const timeLabel = booking.time ? booking.time.trim() : '';
+      if (!timeLabel) continue;
+      slots[booking.date] = slots[booking.date] || [];
+      if (!slots[booking.date].includes(timeLabel)) {
+        slots[booking.date].push(timeLabel);
+      }
+    }
+
+    for (const [date, localTimes] of Object.entries(localBookedSlots)) {
+      slots[date] = slots[date] || [];
+      for (const timeLabel of localTimes) {
+        if (!slots[date].includes(timeLabel)) {
+          slots[date].push(timeLabel);
+        }
+      }
+    }
+
+    return slots;
+  }, [bookingsWithoutCurrentReservation, localBookedSlots]);
+
+  const reservationNamaBhikshaFullyBookedDates = useMemo(() => {
+    return Object.entries(reservationNamaBhikshaSlotsByDate)
+      .filter(([, slots]) => slots.length >= 2)
+      .map(([date]) => date);
+  }, [reservationNamaBhikshaSlotsByDate]);
+
+  const reservationSatsangDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const booking of bookingsWithoutCurrentReservation) {
+      if (!booking.date) continue;
+      if (isSatsangType(booking.type)) {
+        dates.add(booking.date);
+      }
+    }
+    return Array.from(dates);
+  }, [bookingsWithoutCurrentReservation]);
+
+  const reservationLookupTimeOptions = useMemo(() => {
+    if (reservationMode !== 'edit' || !selectedProgram || !reservationLookupDate) {
+      return [];
+    }
+
+    const normalizedSelectedProgram = normalizeProgramType(selectedProgram.name);
+    const bookedOptions = new Set<string>();
+
+    for (const booking of bookings) {
+      if (booking.date !== reservationLookupDate) continue;
+      if (normalizeProgramType(booking.type) !== normalizedSelectedProgram) continue;
+      const timeLabel = booking.time ? booking.time.trim() : '';
+      if (!timeLabel) continue;
+      bookedOptions.add(timeLabel);
+    }
+
+    const [yearStr, monthStr, dayStr] = reservationLookupDate.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+    const dateObj = new Date(year, month - 1, day);
+    const hasValidDate = !Number.isNaN(dateObj.getTime());
+    const generatedOptions = hasValidDate
+      ? generateSlots(selectedProgram.id, dateObj).map((slot) => `${slot.start} - ${slot.end}`)
+      : [];
+
+    const merged: string[] = [];
+    for (const slot of bookedOptions) {
+      if (!merged.includes(slot)) merged.push(slot);
+    }
+    for (const slot of generatedOptions) {
+      if (!merged.includes(slot)) merged.push(slot);
+    }
+
+    return merged;
+  }, [bookings, reservationLookupDate, reservationMode, selectedProgram]);
+
+  const reservationEditTimeOptions = useMemo(() => {
+    if (!selectedProgram || !reservationEditDate) {
+      return [] as string[];
+    }
+
+    const dateStr = reservationEditDate.toLocaleDateString('en-CA');
+    const rawSlots = generateSlots(selectedProgram.id, reservationEditDate);
+    const hasSatsang = reservationSatsangDates.includes(dateStr);
+    const slotsAfterSatsang = hasSatsang
+      ? rawSlots.filter((slot) => slot.period !== 'Evening')
+      : rawSlots;
+
+    if (selectedProgram.id !== 'nama-bhiksha') {
+      return slotsAfterSatsang.map((slot) => `${slot.start} - ${slot.end}`);
+    }
+
+    if (reservationNamaBhikshaFullyBookedDates.includes(dateStr)) {
+      return [];
+    }
+
+    const bookedTimes = new Set(reservationNamaBhikshaSlotsByDate[dateStr] || []);
+    return slotsAfterSatsang
+      .filter((slot) => {
+        const label = `${slot.start} - ${slot.end}`;
+        return !(bookedTimes.has(label) || bookedTimes.has(slot.start));
+      })
+      .map((slot) => `${slot.start} - ${slot.end}`);
+  }, [
+    reservationEditDate,
+    reservationNamaBhikshaFullyBookedDates,
+    reservationNamaBhikshaSlotsByDate,
+    reservationSatsangDates,
+    selectedProgram
+  ]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -187,6 +356,168 @@ const App: React.FC = () => {
       setLocalBookedSlots({});
       alert("Calendar reset successful.");
     }
+  };
+
+  const resetReservationFlow = () => {
+    setReservationMode(null);
+    setReservationLookupDate('');
+    setReservationLookupTime('');
+    setReservationLookupEmail('');
+    setReservationLookupConfirmationNumber('');
+    setReservationLookupError('');
+    setIsReservationLookupLoading(false);
+    setVerifiedReservation(null);
+    setReservationEditDate(null);
+    setReservationEditTime('');
+    setIsReservationSubmitting(false);
+    setReservationResultMessage('');
+  };
+
+  const handleManageReservation = (program: DevotionalProgram) => {
+    setSelectedProgram(program);
+    resetReservationFlow();
+    setCurrentPage(Page.RESERVATION_OPTIONS);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectReservationMode = (mode: 'edit' | 'cancel') => {
+    setReservationMode(mode);
+    setReservationLookupDate('');
+    setReservationLookupTime('');
+    setReservationLookupEmail('');
+    setReservationLookupConfirmationNumber('');
+    setReservationLookupError('');
+    setVerifiedReservation(null);
+    setReservationEditDate(null);
+    setReservationEditTime('');
+    setCurrentPage(Page.RESERVATION_LOOKUP);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleVerifyReservation = async () => {
+    if (!selectedProgram) return;
+    const isEditMode = reservationMode === 'edit';
+    if (
+      !reservationLookupDate ||
+      (isEditMode && !reservationLookupTime.trim()) ||
+      !reservationLookupEmail.trim() ||
+      !reservationLookupConfirmationNumber.trim()
+    ) {
+      setReservationLookupError(
+        isEditMode
+          ? 'Please enter date, time-slot, email, and confirmation number.'
+          : 'Please enter date, email, and confirmation number.'
+      );
+      return;
+    }
+
+    setIsReservationLookupLoading(true);
+    setReservationLookupError('');
+
+    const lookup: ReservationLookupData = {
+      programType: selectedProgram.name,
+      date: reservationLookupDate,
+      ...(isEditMode ? { time: reservationLookupTime.trim() } : {}),
+      email: reservationLookupEmail.trim(),
+      confirmationNumber: reservationLookupConfirmationNumber.trim()
+    };
+
+    const result = await verifyReservation(lookup);
+    setIsReservationLookupLoading(false);
+
+    if (!result.found || !result.reservation) {
+      setVerifiedReservation(null);
+      setReservationLookupError(result.message || 'Sorry! Could not find your Reservation! Please try again.');
+      return;
+    }
+
+    setVerifiedReservation({
+      ...result.reservation,
+      time: result.reservation.time || reservationLookupTime.trim(),
+      email: result.reservation.email || reservationLookupEmail.trim(),
+      confirmationNumber:
+        result.reservation.confirmationNumber || reservationLookupConfirmationNumber.trim()
+    });
+
+    if (reservationMode === 'edit') {
+      const currentDate = new Date(`${result.reservation.date}T00:00:00`);
+      setReservationEditDate(Number.isNaN(currentDate.getTime()) ? null : currentDate);
+      setReservationEditTime('');
+      setCurrentPage(Page.RESERVATION_EDIT);
+    }
+  };
+
+  const handleReservationEditDateSelect = (date: Date) => {
+    setReservationEditDate(date);
+    setReservationEditTime('');
+    setReservationLookupError('');
+  };
+
+  const handleReservationUpdateSubmit = async () => {
+    if (!selectedProgram || !verifiedReservation || !reservationEditDate || !reservationEditTime) {
+      setReservationLookupError('Please choose a new date and time-slot before submitting.');
+      return;
+    }
+
+    setIsReservationSubmitting(true);
+    setReservationLookupError('');
+
+    const payload = {
+      lookup: {
+        programType: selectedProgram.name,
+        date: verifiedReservation.date,
+        time: verifiedReservation.time,
+        email: verifiedReservation.email,
+        confirmationNumber: verifiedReservation.confirmationNumber
+      },
+      updates: {
+        newDate: reservationEditDate.toLocaleDateString('en-CA'),
+        newTime: reservationEditTime
+      }
+    };
+
+    const result = await updateReservation(payload);
+    setIsReservationSubmitting(false);
+
+    if (!result.success) {
+      setReservationLookupError(result.message || 'Failed to update reservation.');
+      return;
+    }
+
+    const refreshed = await fetchBookings();
+    setBookings(refreshed);
+
+    setReservationResultMessage('Your reservation has been updated successfully.');
+    setCurrentPage(Page.RESERVATION_RESULT);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleReservationCancelSubmit = async () => {
+    if (!selectedProgram || !verifiedReservation) return;
+
+    setIsReservationSubmitting(true);
+    setReservationLookupError('');
+
+    const result = await cancelReservation({
+      programType: selectedProgram.name,
+      date: verifiedReservation.date,
+      email: verifiedReservation.email,
+      confirmationNumber: verifiedReservation.confirmationNumber
+    });
+
+    setIsReservationSubmitting(false);
+
+    if (!result.success) {
+      setReservationLookupError(result.message || 'Failed to cancel reservation.');
+      return;
+    }
+
+    const refreshed = await fetchBookings();
+    setBookings(refreshed);
+
+    setReservationResultMessage('Your reservation has been cancelled successfully.');
+    setCurrentPage(Page.RESERVATION_RESULT);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async (data: BookingData) => {
@@ -349,6 +680,7 @@ const App: React.FC = () => {
                       key={program.id}
                       program={program}
                       onBook={handleProgramSelect}
+                      onManageReservation={handleManageReservation}
                       onDonate={(selected) =>
                         selected.id === 'nama-bhiksha'
                           ? handleDonateOpen()
@@ -367,6 +699,7 @@ const App: React.FC = () => {
                         key={PROGRAMS[PROGRAMS.length - 1].id}
                         program={PROGRAMS[PROGRAMS.length - 1]}
                         onBook={handleProgramSelect}
+                        onManageReservation={handleManageReservation}
                         onDonate={(selected) =>
                           selected.id === 'nama-bhiksha'
                             ? handleDonateOpen()
@@ -558,6 +891,297 @@ const App: React.FC = () => {
               >
                 Back to Homepage
               </button>
+            </div>
+          </section>
+        );
+
+      case Page.RESERVATION_OPTIONS:
+        return (
+          <section className="py-12 px-4 bg-gray-50 min-h-screen">
+            <div className="container mx-auto max-w-2xl">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">Manage Reservation</h2>
+                <p className="text-gray-600 mb-8">
+                  Program: <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span>
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    onClick={() => handleSelectReservationMode('edit')}
+                    className="px-6 py-5 rounded-xl bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all shadow-md"
+                  >
+                    Edit Reservation
+                  </button>
+                  <button
+                    onClick={() => handleSelectReservationMode('cancel')}
+                    className="px-6 py-5 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-all"
+                  >
+                    Cancel Reservation
+                  </button>
+                </div>
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={() => setCurrentPage(Page.HOME)}
+                    className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back to Programs
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case Page.RESERVATION_LOOKUP:
+        return (
+          <section className="py-12 px-4 bg-gray-50 min-h-screen">
+            <div className="container mx-auto max-w-2xl">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">
+                  {reservationMode === 'edit' ? 'Edit Reservation' : 'Cancel Reservation'}
+                </h2>
+                <p className="text-gray-600 mb-8">
+                  Enter your reservation details for <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span>.
+                </p>
+
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                      Program Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={reservationLookupDate}
+                      onChange={(e) => {
+                        setReservationLookupDate(e.target.value);
+                        setReservationLookupTime('');
+                        setVerifiedReservation(null);
+                        setReservationLookupError('');
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
+                    />
+                  </div>
+
+                  {reservationMode === 'edit' && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                        Time Slot *
+                      </label>
+                      <select
+                        value={reservationLookupTime}
+                        onChange={(e) => {
+                          setReservationLookupTime(e.target.value);
+                          setVerifiedReservation(null);
+                          setReservationLookupError('');
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
+                        disabled={!reservationLookupDate}
+                      >
+                        <option value="">
+                          {reservationLookupDate
+                            ? (reservationLookupTimeOptions.length > 0
+                                ? 'Select a time slot'
+                                : 'No slots found for selected date')
+                            : 'Select program date first'}
+                        </option>
+                        {reservationLookupTimeOptions.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={reservationLookupEmail}
+                      onChange={(e) => {
+                        setReservationLookupEmail(e.target.value);
+                        setVerifiedReservation(null);
+                        setReservationLookupError('');
+                      }}
+                      placeholder="email@example.com"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                      Confirmation Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={reservationLookupConfirmationNumber}
+                      onChange={(e) => {
+                        setReservationLookupConfirmationNumber(e.target.value);
+                        setVerifiedReservation(null);
+                        setReservationLookupError('');
+                      }}
+                      placeholder="Enter confirmation number"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {reservationLookupError && (
+                  <div className="mt-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+                    {reservationLookupError}
+                  </div>
+                )}
+
+                {verifiedReservation && reservationMode === 'cancel' && (
+                  <div className="mt-6 p-4 rounded-xl border border-[#2E3192]/20 bg-[#2E3192]/5">
+                    <h4 className="text-sm uppercase tracking-widest text-gray-500 font-bold mb-2">Reservation Found</h4>
+                    <p className="text-sm text-gray-700"><strong>Date:</strong> {verifiedReservation.date}</p>
+                    <p className="text-sm text-gray-700"><strong>Time:</strong> {verifiedReservation.time}</p>
+                    <p className="text-sm text-gray-700"><strong>Email:</strong> {verifiedReservation.email}</p>
+                    <p className="text-sm text-gray-700"><strong>Confirmation:</strong> {verifiedReservation.confirmationNumber}</p>
+                    <button
+                      onClick={handleReservationCancelSubmit}
+                      disabled={isReservationSubmitting}
+                      className="mt-4 w-full px-4 py-3 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition-all disabled:opacity-60"
+                    >
+                      {isReservationSubmitting ? 'Cancelling...' : 'Confirm Cancel Reservation'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleVerifyReservation}
+                    disabled={isReservationLookupLoading || isReservationSubmitting}
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
+                  >
+                    {isReservationLookupLoading ? 'Checking...' : 'Find Reservation'}
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Page.RESERVATION_OPTIONS)}
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case Page.RESERVATION_EDIT:
+        const editCalendarBlockedDates =
+          selectedProgram?.id === 'nama-bhiksha'
+            ? Array.from(new Set([...reservationBlockedDates, ...reservationNamaBhikshaFullyBookedDates]))
+            : reservationBlockedDates;
+
+        return (
+          <section className="py-12 px-4 bg-gray-50 min-h-screen">
+            <div className="container mx-auto max-w-5xl">
+              <div className="mb-8 text-center">
+                <h2 className="text-3xl font-bold text-[#2E3192] serif">Choose a new Date and Time for your Reservation!</h2>
+                <p className="text-gray-500">
+                  Current: {verifiedReservation?.date} {verifiedReservation?.time ? `(${verifiedReservation.time})` : ''}
+                </p>
+              </div>
+
+              <div className="max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h4 className="font-bold text-[#2E3192] mb-6 flex items-center text-lg">
+                  <span className="w-8 h-8 rounded-full bg-[#2E3192] text-white flex items-center justify-center mr-3 text-sm">1</span>
+                  Choose New Date
+                </h4>
+                <CalendarView
+                  programId={selectedProgram!.id}
+                  onSelectDate={handleReservationEditDateSelect}
+                  selectedDate={reservationEditDate}
+                  bookedDates={editCalendarBlockedDates}
+                />
+
+                <div className="mt-8">
+                  <h4 className="font-bold text-[#2E3192] mb-3 flex items-center text-lg">
+                    <span className="w-8 h-8 rounded-full bg-[#2E3192] text-white flex items-center justify-center mr-3 text-sm">2</span>
+                    Choose New Time Slot
+                  </h4>
+                  <select
+                    value={reservationEditTime}
+                    onChange={(e) => {
+                      setReservationEditTime(e.target.value);
+                      setReservationLookupError('');
+                    }}
+                    disabled={!reservationEditDate}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <option value="">
+                      {!reservationEditDate
+                        ? 'Select new date first'
+                        : reservationEditTimeOptions.length > 0
+                          ? 'Select new time slot'
+                          : 'No slots available on selected date'}
+                    </option>
+                    {reservationEditTimeOptions.map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {reservationLookupError && (
+                  <div className="mt-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+                    {reservationLookupError}
+                  </div>
+                )}
+
+                <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleReservationUpdateSubmit}
+                    disabled={isReservationSubmitting || !reservationEditDate || !reservationEditTime}
+                    className="w-full sm:w-auto px-8 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
+                  >
+                    {isReservationSubmitting ? 'Updating...' : 'Submit Update'}
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Page.RESERVATION_LOOKUP)}
+                    className="w-full sm:w-auto px-8 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case Page.RESERVATION_RESULT:
+        return (
+          <section className="py-24 px-4 bg-gray-50 min-h-screen">
+            <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i className="fas fa-check text-2xl"></i>
+              </div>
+              <h2 className="text-3xl font-bold text-[#2E3192] serif mb-3">Request Completed</h2>
+              <p className="text-gray-600 mb-8">{reservationResultMessage}</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    resetReservationFlow();
+                    setCurrentPage(Page.HOME);
+                  }}
+                  className="px-8 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all"
+                >
+                  Back to Homepage
+                </button>
+                <button
+                  onClick={() => {
+                    resetReservationFlow();
+                    setCurrentPage(Page.RESERVATION_OPTIONS);
+                  }}
+                  className="px-8 py-3 rounded-lg border border-[#2E3192] text-[#2E3192] font-bold hover:bg-[#2E3192]/5 transition-all"
+                >
+                  Manage Another
+                </button>
+              </div>
             </div>
           </section>
         );

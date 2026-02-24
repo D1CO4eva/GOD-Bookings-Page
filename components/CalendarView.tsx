@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { isDateSelectable } from '../utils/slotUtils';
 
 interface CalendarViewProps {
@@ -10,7 +10,9 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, selectedDate, bookedDates }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth()); // Start at today's month
+  const [currentMonth, setCurrentMonth] = useState(
+    selectedDate ? selectedDate.getMonth() : new Date().getMonth()
+  );
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
@@ -21,6 +23,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
 
   const handlePrev = () => setCurrentMonth(prev => Math.max(0, prev - 1));
   const handleNext = () => setCurrentMonth(prev => Math.min(11, prev + 1));
+
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentMonth(selectedDate.getMonth());
+    }
+  }, [selectedDate]);
 
   const renderDays = () => {
     const days = [];

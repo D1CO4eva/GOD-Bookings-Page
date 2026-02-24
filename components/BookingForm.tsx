@@ -364,7 +364,11 @@ const BookingForm: React.FC<BookingFormProps> = ({
               {selectedSlot.start} - {selectedSlot.end} ({selectedSlot.durationLabel})
             </p>
           </div>
-          <button onClick={onCancel} className="text-sm text-[#2E3192] font-semibold hover:underline">
+          <button
+            onClick={onCancel}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2E3192] bg-white text-sm text-[#2E3192] font-bold shadow-sm hover:bg-[#2E3192] hover:text-white transition-colors"
+          >
+            <i className="fas fa-pen text-xs"></i>
             Change
           </button>
         </div>

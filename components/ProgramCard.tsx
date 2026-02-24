@@ -6,9 +6,10 @@ interface ProgramCardProps {
   program: DevotionalProgram;
   onBook: (program: DevotionalProgram) => void;
   onDonate?: (program: DevotionalProgram) => void;
+  onManageReservation?: (program: DevotionalProgram) => void;
 }
 
-const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate }) => {
+const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, onManageReservation }) => {
   const imageUrls = useMemo(() => {
     const folderImages = PROGRAM_IMAGE_MANIFEST[program.id] || [];
     if (folderImages.length > 0) {
@@ -152,13 +153,22 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate }) 
         
         <div className="flex-grow"></div>
         
-        <button 
-          onClick={() => onBook(program)}
-          className="w-full bg-[#2E3192] text-white py-3 rounded-lg font-semibold hover:bg-indigo-900 transition-all shadow-md active:scale-95 duration-150 mt-2 group"
-        >
-          Book this program
-          <i className="fas fa-chevron-right ml-2 text-xs opacity-0 group-hover:opacity-100 transition-all"></i>
-        </button>
+        <div className="space-y-2 mt-2">
+          <button
+            onClick={() => onBook(program)}
+            className="w-full bg-[#2E3192] text-white py-3 rounded-lg font-semibold hover:bg-indigo-900 transition-all shadow-md active:scale-95 duration-150 group"
+          >
+            Book this program
+            <i className="fas fa-chevron-right ml-2 text-xs opacity-0 group-hover:opacity-100 transition-all"></i>
+          </button>
+          <button
+            type="button"
+            onClick={() => onManageReservation?.(program)}
+            className="w-full bg-white text-[#2E3192] py-3 rounded-lg font-semibold border border-[#2E3192]/40 hover:bg-[#2E3192]/5 transition-all shadow-sm active:scale-95 duration-150"
+          >
+            Already have a Reservation?
+          </button>
+        </div>
       </div>
     </div>
   );
