@@ -10,30 +10,56 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, selectedDate, bookedDates }) => {
-  const [currentMonth, setCurrentMonth] = useState(
-    selectedDate ? selectedDate.getMonth() : new Date().getMonth()
+  const calendarStart = new Date(2026, 0, 1);
+  const calendarEnd = new Date(2027, 11, 1);
+  const clampToRange = (value: Date) => {
+    const monthValue = new Date(value.getFullYear(), value.getMonth(), 1);
+    if (monthValue < calendarStart) return calendarStart;
+    if (monthValue > calendarEnd) return calendarEnd;
+    return monthValue;
+  };
+
+  const [currentMonthDate, setCurrentMonthDate] = useState(() =>
+    clampToRange(selectedDate ? selectedDate : new Date())
   );
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const daysInMonth = (month: number) => new Date(2026, month + 1, 0).getDate();
-  const firstDayOfMonth = (month: number) => new Date(2026, month, 1).getDay();
+  const currentMonth = currentMonthDate.getMonth();
+  const currentYear = currentMonthDate.getFullYear();
+  const daysInMonth = () => new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = () => new Date(currentYear, currentMonth, 1).getDay();
 
-  const handlePrev = () => setCurrentMonth(prev => Math.max(0, prev - 1));
-  const handleNext = () => setCurrentMonth(prev => Math.min(11, prev + 1));
+  const handlePrev = () => {
+    setCurrentMonthDate((prev) => {
+      const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+      return clampToRange(next);
+    });
+  };
+  const handleNext = () => {
+    setCurrentMonthDate((prev) => {
+      const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+      return clampToRange(next);
+    });
+  };
 
   useEffect(() => {
     if (selectedDate) {
-      setCurrentMonth(selectedDate.getMonth());
+      setCurrentMonthDate(clampToRange(selectedDate));
     }
   }, [selectedDate]);
 
+  const isAtStartMonth =
+    currentYear === calendarStart.getFullYear() && currentMonth === calendarStart.getMonth();
+  const isAtEndMonth =
+    currentYear === calendarEnd.getFullYear() && currentMonth === calendarEnd.getMonth();
+
   const renderDays = () => {
     const days = [];
-    const totalDays = daysInMonth(currentMonth);
-    const firstDay = firstDayOfMonth(currentMonth);
+    const totalDays = daysInMonth();
+    const firstDay = firstDayOfMonth();
 
     // Padding for first week
     for (let i = 0; i < firstDay; i++) {
@@ -41,7 +67,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
     }
 
     for (let d = 1; d <= totalDays; d++) {
-      const date = new Date(2026, currentMonth, d);
+      const date = new Date(currentYear, currentMonth, d);
       const selectable = isDateSelectable(programId, date, bookedDates);
       const isSelected = selectedDate?.toDateString() === date.toDateString();
 
@@ -66,14 +92,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
   return (
     <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 max-w-md mx-auto">
       <div className="bg-[#2E3192] p-6 text-white flex justify-between items-center">
-        <button onClick={handlePrev} disabled={currentMonth === 0} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-30">
+        <button onClick={handlePrev} disabled={isAtStartMonth} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-30">
           <i className="fas fa-chevron-left"></i>
         </button>
         <div className="text-center">
           <h3 className="text-xl font-bold serif">{months[currentMonth]}</h3>
-          <p className="text-sm opacity-80">2026</p>
+          <p className="text-sm opacity-80">{currentYear}</p>
         </div>
-        <button onClick={handleNext} disabled={currentMonth === 11} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-30">
+        <button onClick={handleNext} disabled={isAtEndMonth} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-30">
           <i className="fas fa-chevron-right"></i>
         </button>
       </div>

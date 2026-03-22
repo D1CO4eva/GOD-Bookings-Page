@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DevotionalProgram, BookingData, FormErrors, TimeSlot } from '../types';
+import { toDateKey } from '../utils/dateUtils';
 
 interface BookingFormProps {
   program: DevotionalProgram;
@@ -280,7 +281,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      const dateIso = selectedDate.toLocaleDateString('en-CA');
+      const dateIso = toDateKey(selectedDate);
       const timeLabel = `${selectedSlot.start} - ${selectedSlot.end}`;
       const fullAddressStr = `${formData.street}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
       const phoneDigits = formData.phoneNumber.replace(/\D/g, '');

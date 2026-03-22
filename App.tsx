@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
 import ProgramCard from './components/ProgramCard';
 import CalendarView from './components/CalendarView';
@@ -11,15 +11,21 @@ import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot, Reservat
 import { PROGRAMS } from './constants';
 import { fetchBookings, submitToGoogleSheets, verifyReservation, updateReservation, cancelReservation } from './services/googleSheetsService';
 import { generateSlots } from './utils/slotUtils';
-
-const KNOWN_PROGRAM_TYPES = new Set([
-  'radha kalyanam',
-  'nikunja utsavam',
-  'thirumanjanam',
-  'nama ruchi',
-  'nama bhiksha',
-  'satsang'
-]);
+import { toDateKey, parseDateKey } from './utils/dateUtils';
+import {
+  getProgramAvailabilityFlags,
+  isNamaBhikshaType,
+  isSatsangType,
+  isSpecialProgramType,
+  normalizeConfirmationForMatch,
+  normalizeEmailForMatch,
+  normalizeProgramType,
+  normalizeTimeForMatch,
+  resolveProgramByType
+} from './utils/programUtils';
+import { getPathForPage, parsePathToPage } from './utils/routeUtils';
+const CONTACT_EMAIL = 'atlantanamadwaar@gmail.com';
+const CONTACT_PHONE = '404-788-7391';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
@@ -27,6 +33,7 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingSubmitError, setBookingSubmitError] = useState('');
   const [isDonateOpen, setIsDonateOpen] = useState(false);
   const [isEventPopupOpen, setIsEventPopupOpen] = useState(false);
   const [eventPopupStartInFullView, setEventPopupStartInFullView] = useState(false);
@@ -50,16 +57,55 @@ const App: React.FC = () => {
   const [reservationEditTime, setReservationEditTime] = useState('');
   const [isReservationSubmitting, setIsReservationSubmitting] = useState(false);
   const [reservationResultMessage, setReservationResultMessage] = useState('');
+  const hasAppliedInitialRoute = useRef(false);
 
-  const normalizeProgramType = (value: string) => value.trim().toLowerCase();
-  const isSatsangType = (value: string) => normalizeProgramType(value) === 'satsang';
-  const isNamaBhikshaType = (value: string) => normalizeProgramType(value) === 'nama bhiksha';
-  const isSpecialProgramType = (value: string) => {
-    const normalized = normalizeProgramType(value);
-    return normalized.length > 0 && !KNOWN_PROGRAM_TYPES.has(normalized);
+  const resolveProgramTypeForReservationLookup = ({
+    programType,
+    date,
+    time,
+    email,
+    confirmationNumber
+  }: {
+    programType: string;
+    date: string;
+    time?: string;
+    email: string;
+    confirmationNumber: string;
+  }) => {
+    if (normalizeProgramType(programType) !== 'radha kalyanam') {
+      return programType;
+    }
+
+    const normalizedEmail = normalizeEmailForMatch(email);
+    const normalizedConfirmation = normalizeConfirmationForMatch(confirmationNumber);
+    const normalizedTime = time ? normalizeTimeForMatch(time) : '';
+
+    const candidates = bookings.filter((booking) => {
+      if (normalizeProgramType(booking.type) !== 'radha kalyanam') return false;
+      if (booking.date !== date) return false;
+      if (normalizeEmailForMatch(booking.email || '') !== normalizedEmail) return false;
+      if (
+        normalizeConfirmationForMatch(booking.confirmationNumber || '') !== normalizedConfirmation
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (!candidates.length) return programType;
+
+    if (normalizedTime) {
+      const exactTimeMatch = candidates.find(
+        (booking) => normalizeTimeForMatch(booking.time || '') === normalizedTime
+      );
+      if (exactTimeMatch?.type) return exactTimeMatch.type;
+    }
+
+    const suffixedMatch = candidates.find((booking) =>
+      /^radha kalyanam\s*-/i.test((booking.type || '').trim())
+    );
+    return suffixedMatch?.type || candidates[0].type || programType;
   };
-  const normalizeEmailForMatch = (value: string) => value.trim().toLowerCase();
-  const normalizeConfirmationForMatch = (value: string) => value.trim().toLowerCase();
 
   const satsangDates = useMemo(() => {
     const dates = new Set<string>();
@@ -111,7 +157,7 @@ const App: React.FC = () => {
       }
     }
 
-    for (const [date, localTimes] of Object.entries(localBookedSlots)) {
+    for (const [date, localTimes] of Object.entries(localBookedSlots) as Array<[string, string[]]>) {
       slots[date] = slots[date] || [];
       for (const timeLabel of localTimes) {
         if (!slots[date].includes(timeLabel)) {
@@ -124,7 +170,7 @@ const App: React.FC = () => {
   }, [bookings, localBookedSlots]);
 
   const namaBhikshaFullyBookedDates = useMemo(() => {
-    return Object.entries(namaBhikshaSlotsByDate)
+    return (Object.entries(namaBhikshaSlotsByDate) as Array<[string, string[]]>)
       .filter(([, slots]) => slots.length >= 2)
       .map(([date]) => date);
   }, [namaBhikshaSlotsByDate]);
@@ -190,7 +236,7 @@ const App: React.FC = () => {
       }
     }
 
-    for (const [date, localTimes] of Object.entries(localBookedSlots)) {
+    for (const [date, localTimes] of Object.entries(localBookedSlots) as Array<[string, string[]]>) {
       slots[date] = slots[date] || [];
       for (const timeLabel of localTimes) {
         if (!slots[date].includes(timeLabel)) {
@@ -203,7 +249,7 @@ const App: React.FC = () => {
   }, [bookingsWithoutCurrentReservation, localBookedSlots]);
 
   const reservationNamaBhikshaFullyBookedDates = useMemo(() => {
-    return Object.entries(reservationNamaBhikshaSlotsByDate)
+    return (Object.entries(reservationNamaBhikshaSlotsByDate) as Array<[string, string[]]>)
       .filter(([, slots]) => slots.length >= 2)
       .map(([date]) => date);
   }, [reservationNamaBhikshaSlotsByDate]);
@@ -235,13 +281,8 @@ const App: React.FC = () => {
       bookedOptions.add(timeLabel);
     }
 
-    const [yearStr, monthStr, dayStr] = reservationLookupDate.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const day = Number(dayStr);
-    const dateObj = new Date(year, month - 1, day);
-    const hasValidDate = !Number.isNaN(dateObj.getTime());
-    const generatedOptions = hasValidDate
+    const dateObj = parseDateKey(reservationLookupDate);
+    const generatedOptions = dateObj
       ? generateSlots(selectedProgram.id, dateObj).map((slot) => `${slot.start} - ${slot.end}`)
       : [];
 
@@ -261,7 +302,7 @@ const App: React.FC = () => {
       return [] as string[];
     }
 
-    const dateStr = reservationEditDate.toLocaleDateString('en-CA');
+    const dateStr = toDateKey(reservationEditDate);
     const rawSlots = generateSlots(selectedProgram.id, reservationEditDate);
     const hasSatsang = reservationSatsangDates.includes(dateStr);
     const slotsAfterSatsang = hasSatsang
@@ -325,10 +366,65 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasAppliedInitialRoute.current) {
+      return;
+    }
+
+    const nextPath = getPathForPage(currentPage, reservationMode);
+    const normalize = (value: string) => value.replace(/\/+$/, '');
+    if (normalize(window.location.pathname) === normalize(nextPath)) {
+      return;
+    }
+
+    window.history.pushState({}, '', nextPath);
+  }, [currentPage, reservationMode]);
+
+  useEffect(() => {
+    const resolveRouteTarget = (target: { page: Page; reservationMode: 'edit' | 'cancel' | null }) => {
+      const requiresVerifiedReservation =
+        target.page === Page.RESERVATION_OPTIONS ||
+        target.page === Page.RESERVATION_EDIT ||
+        target.page === Page.RESERVATION_LOOKUP ||
+        target.page === Page.RESERVATION_RESULT;
+
+      if (requiresVerifiedReservation && !verifiedReservation) {
+        return { page: Page.RESERVATION_CONFIRMATION, reservationMode: null };
+      }
+
+      if (target.page === Page.BOOKING_CALENDAR && !selectedProgram) {
+        return { page: Page.HOME, reservationMode: null };
+      }
+      if (target.page === Page.BOOKING_FORM && (!selectedProgram || !selectedDate || !selectedSlot)) {
+        return selectedProgram
+          ? { page: Page.BOOKING_CALENDAR, reservationMode: null }
+          : { page: Page.HOME, reservationMode: null };
+      }
+      if (target.page === Page.RESERVATION_EDIT && !selectedProgram) {
+        return { page: Page.HOME, reservationMode: null };
+      }
+      return target;
+    };
+
+    const handlePathChange = () => {
+      const target = resolveRouteTarget(parsePathToPage(window.location.pathname));
+      hasAppliedInitialRoute.current = true;
+      setReservationMode(target.reservationMode);
+      setCurrentPage(target.page);
+    };
+
+    window.addEventListener('popstate', handlePathChange);
+    handlePathChange();
+    return () => {
+      window.removeEventListener('popstate', handlePathChange);
+    };
+  }, [selectedDate, selectedProgram, selectedSlot, verifiedReservation]);
+
   const handleProgramSelect = (program: DevotionalProgram) => {
     setSelectedProgram(program);
     setSelectedDate(null);
     setSelectedSlot(null);
+    setBookingSubmitError('');
     setCurrentPage(Page.BOOKING_CALENDAR);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -337,6 +433,18 @@ const App: React.FC = () => {
     setDonateTitle(title);
     setDonateMessage(message);
     setIsDonateOpen(true);
+  };
+
+  const handleProgramDonate = (program: DevotionalProgram) => {
+    if (program.id === 'nama-bhiksha') {
+      handleDonateOpen();
+      return;
+    }
+
+    handleDonateOpen(
+      `Donation for ${program.name}`,
+      `Your contribution helps us offer ${program.name} with love and devotion.`
+    );
   };
 
   const handleDateSelect = (date: Date) => {
@@ -376,21 +484,82 @@ const App: React.FC = () => {
   const handleManageReservation = (program: DevotionalProgram) => {
     setSelectedProgram(program);
     resetReservationFlow();
+    setCurrentPage(Page.RESERVATION_CONFIRMATION);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleVerifyReservationByConfirmation = async () => {
+    const rawConfirmation = reservationLookupConfirmationNumber.trim();
+    const normalizedConfirmation = normalizeConfirmationForMatch(rawConfirmation);
+    if (!normalizedConfirmation) {
+      setReservationLookupError('Please enter your confirmation number.');
+      return;
+    }
+
+    setIsReservationLookupLoading(true);
+    setReservationLookupError('');
+
+    const result = await verifyReservation({
+      confirmationNumber: rawConfirmation,
+      ...(selectedProgram ? { programType: selectedProgram.name } : {})
+    });
+
+    setIsReservationLookupLoading(false);
+
+    if (!result.found || !result.reservation) {
+      setVerifiedReservation(null);
+      setReservationLookupError(result.message || 'Sorry! Could not find your Reservation! Please try again.');
+      return;
+    }
+
+    if (!result.reservation.date || !result.reservation.programType || !result.reservation.email) {
+      setVerifiedReservation(null);
+      setReservationLookupError(
+        'Found reservation, but required details are incomplete. Please contact support.'
+      );
+      return;
+    }
+
+    const resolvedProgram = resolveProgramByType(result.reservation.programType, PROGRAMS);
+    if (resolvedProgram) {
+      setSelectedProgram(resolvedProgram);
+    }
+
+    setVerifiedReservation({
+      programType: result.reservation.programType,
+      date: result.reservation.date,
+      time: result.reservation.time || '',
+      email: result.reservation.email,
+      confirmationNumber: result.reservation.confirmationNumber || rawConfirmation,
+      occasion: result.reservation.occasion || ''
+    });
+    setReservationMode(null);
     setCurrentPage(Page.RESERVATION_OPTIONS);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectReservationMode = (mode: 'edit' | 'cancel') => {
+    if (!verifiedReservation) {
+      setReservationLookupError('Please validate your confirmation number first.');
+      setCurrentPage(Page.RESERVATION_CONFIRMATION);
+      return;
+    }
+
     setReservationMode(mode);
     setReservationLookupDate('');
     setReservationLookupTime('');
-    setReservationLookupEmail('');
-    setReservationLookupConfirmationNumber('');
     setReservationLookupError('');
-    setVerifiedReservation(null);
     setReservationEditDate(null);
     setReservationEditTime('');
-    setCurrentPage(Page.RESERVATION_LOOKUP);
+
+    if (mode === 'edit') {
+      const currentDate = new Date(`${verifiedReservation.date}T00:00:00`);
+      setReservationEditDate(Number.isNaN(currentDate.getTime()) ? null : currentDate);
+      setCurrentPage(Page.RESERVATION_EDIT);
+    } else {
+      setCurrentPage(Page.RESERVATION_LOOKUP);
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -414,8 +583,16 @@ const App: React.FC = () => {
     setIsReservationLookupLoading(true);
     setReservationLookupError('');
 
-    const lookup: ReservationLookupData = {
+    const lookupProgramType = resolveProgramTypeForReservationLookup({
       programType: selectedProgram.name,
+      date: reservationLookupDate,
+      ...(isEditMode ? { time: reservationLookupTime.trim() } : {}),
+      email: reservationLookupEmail.trim(),
+      confirmationNumber: reservationLookupConfirmationNumber.trim()
+    });
+
+    const lookup: ReservationLookupData = {
+      programType: lookupProgramType,
       date: reservationLookupDate,
       ...(isEditMode ? { time: reservationLookupTime.trim() } : {}),
       email: reservationLookupEmail.trim(),
@@ -464,14 +641,14 @@ const App: React.FC = () => {
 
     const payload = {
       lookup: {
-        programType: selectedProgram.name,
+        programType: verifiedReservation.programType || selectedProgram.name,
         date: verifiedReservation.date,
         time: verifiedReservation.time,
         email: verifiedReservation.email,
         confirmationNumber: verifiedReservation.confirmationNumber
       },
       updates: {
-        newDate: reservationEditDate.toLocaleDateString('en-CA'),
+        newDate: toDateKey(reservationEditDate),
         newTime: reservationEditTime
       }
     };
@@ -499,7 +676,7 @@ const App: React.FC = () => {
     setReservationLookupError('');
 
     const result = await cancelReservation({
-      programType: selectedProgram.name,
+      programType: verifiedReservation.programType || selectedProgram.name,
       date: verifiedReservation.date,
       email: verifiedReservation.email,
       confirmationNumber: verifiedReservation.confirmationNumber
@@ -522,11 +699,12 @@ const App: React.FC = () => {
 
   const handleSubmit = async (data: BookingData) => {
     setIsSubmitting(true);
+    setBookingSubmitError('');
     try {
       const latestBookings = bookings;
 
       if (selectedDate) {
-        const dateStr = selectedDate.toLocaleDateString('en-CA');
+        const dateStr = toDateKey(selectedDate);
         const programId = selectedProgram?.id;
         if (programId === 'nama-bhiksha') {
           const hasSatsang = latestBookings.some(
@@ -573,14 +751,19 @@ const App: React.FC = () => {
         }
       }
 
-      const submitPromise = submitToGoogleSheets(data);
-      await new Promise<void>((resolve) => {
-        window.setTimeout(resolve, 2000);
-      });
+      setCurrentPage(Page.BOOKING_PROCESSING);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // Optimistically block the selected date/slot in this browser immediately.
+      const submitResult = await submitToGoogleSheets(data);
+      if (!submitResult.success) {
+        setBookingSubmitError('Sorry! Your booking request could not be processed at this time!');
+        setCurrentPage(Page.BOOKING_FAILED);
+        return;
+      }
+
+      // Only block the selected date/slot locally after confirmed API success.
       if (selectedDate) {
-        const dateStr = selectedDate.toLocaleDateString('en-CA');
+        const dateStr = toDateKey(selectedDate);
         if (selectedProgram?.id === 'nama-bhiksha') {
           const timeLabel = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
           if (timeLabel) {
@@ -595,24 +778,12 @@ const App: React.FC = () => {
       }
 
       setCurrentPage(Page.SUCCESS);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      void submitPromise
-        .then((success) => {
-          if (!success) {
-            console.error('Submission failed after optimistic success transition.');
-            return;
-          }
-          void fetchBookings()
-            .then((records) => {
-              setBookings(records);
-            })
-            .catch((error) => {
-              console.error('Error refreshing bookings after submit:', error);
-            });
+      void fetchBookings()
+        .then((records) => {
+          setBookings(records);
         })
         .catch((error) => {
-          console.error('Submission error after optimistic success transition:', error);
+          console.error('Error refreshing bookings after submit:', error);
         });
     } finally {
       setIsSubmitting(false);
@@ -638,6 +809,10 @@ const App: React.FC = () => {
                   <h1 className="text-5xl md:text-7xl font-bold mb-6 serif tracking-tight">Atlanta Namadwaar</h1>
                   <p className="text-xl md:text-3xl text-indigo-100 max-w-3xl mx-auto mb-12 italic font-light leading-relaxed">
                     Bring the divine atmosphere of Atlanta Namadwaar into your own home.
+                  </p>
+                  <p className="text-sm md:text-base text-indigo-100/95 mb-8 font-semibold tracking-wide">
+                    <i className="fas fa-location-dot mr-2"></i>
+                    239 Atlanta Rd, Cumming, GA
                   </p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <button 
@@ -681,14 +856,7 @@ const App: React.FC = () => {
                       program={program}
                       onBook={handleProgramSelect}
                       onManageReservation={handleManageReservation}
-                      onDonate={(selected) =>
-                        selected.id === 'nama-bhiksha'
-                          ? handleDonateOpen()
-                          : handleDonateOpen(
-                              `Donation for ${selected.name}`,
-                              `Your contribution helps us offer ${selected.name} with love and devotion.`
-                            )
-                      }
+                      onDonate={handleProgramDonate}
                     />
                   ))}
                 </div>
@@ -700,14 +868,7 @@ const App: React.FC = () => {
                         program={PROGRAMS[PROGRAMS.length - 1]}
                         onBook={handleProgramSelect}
                         onManageReservation={handleManageReservation}
-                        onDonate={(selected) =>
-                          selected.id === 'nama-bhiksha'
-                            ? handleDonateOpen()
-                            : handleDonateOpen(
-                                `Donation for ${selected.name}`,
-                                `Your contribution helps us offer ${selected.name} with love and devotion.`
-                              )
-                        }
+                        onDonate={handleProgramDonate}
                       />
                     </div>
                   </div>
@@ -719,15 +880,16 @@ const App: React.FC = () => {
 
       case Page.BOOKING_CALENDAR:
         const rawSlots = selectedDate ? generateSlots(selectedProgram!.id, selectedDate) : [];
-        const satsangDateStr = selectedDate ? selectedDate.toLocaleDateString('en-CA') : '';
+        const satsangDateStr = selectedDate ? toDateKey(selectedDate) : '';
         const hasSatsang = satsangDateStr ? satsangDates.includes(satsangDateStr) : false;
+        const availabilityFlags = getProgramAvailabilityFlags(selectedProgram?.id);
         const slotsAfterSatsang = hasSatsang
           ? rawSlots.filter(slot => slot.period !== 'Evening')
           : rawSlots;
         const availableSlots =
           selectedDate && selectedProgram?.id === 'nama-bhiksha'
             ? (() => {
-                const dateStr = selectedDate.toLocaleDateString('en-CA');
+                const dateStr = toDateKey(selectedDate);
                 if (namaBhikshaFullyBookedDates.includes(dateStr)) {
                   return [];
                 }
@@ -746,7 +908,20 @@ const App: React.FC = () => {
             <div className="container mx-auto max-w-5xl">
               <div className="mb-12 text-center">
                 <h2 className="text-4xl font-bold text-[#2E3192] serif mb-2">Schedule Your Session</h2>
-                <p className="text-gray-500 text-lg">Booking: <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span> for 2026</p>
+                <p className="text-gray-500 text-lg">Booking: <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span> for 2026-2027</p>
+                {availabilityFlags.length > 0 && (
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {availabilityFlags.map((flag) => (
+                      <span
+                        key={flag}
+                        className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-[#2E3192]"
+                      >
+                        <i className="fas fa-flag mr-1"></i>
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -859,6 +1034,51 @@ const App: React.FC = () => {
           </section>
         );
 
+      case Page.BOOKING_PROCESSING:
+        return (
+          <section className="py-32 px-4 text-center animate-fade-in">
+            <div className="max-w-xl mx-auto">
+              <div className="w-24 h-24 bg-[#2E3192]/10 text-[#2E3192] rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl">
+                 <i className="fas fa-spinner fa-spin text-4xl"></i>
+              </div>
+              <h2 className="text-4xl font-bold text-[#2E3192] mb-4 serif">Your Booking Request is Being Processed</h2>
+              <p className="text-xl text-gray-600 leading-relaxed">
+                Please stand by while we confirm your booking request.
+              </p>
+            </div>
+          </section>
+        );
+
+      case Page.BOOKING_FAILED:
+        return (
+          <section className="py-32 px-4 text-center animate-fade-in">
+            <div className="max-w-xl mx-auto">
+              <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl">
+                 <i className="fas fa-circle-exclamation text-4xl"></i>
+              </div>
+              <h2 className="text-4xl font-bold text-[#2E3192] mb-4 serif">Booking Request Not Processed</h2>
+              <div className="space-y-6 text-xl text-gray-600 mb-10 leading-relaxed">
+                <p>
+                  {bookingSubmitError || 'Sorry! Your booking request could not be processed at this time.'}
+                </p>
+                <p>
+                  Please contact us via email or phone, and we will help you complete your booking.
+                </p>
+                <p className="font-bold text-[#2E3192]">
+                  Email: {CONTACT_EMAIL}<br />
+                  Phone: {CONTACT_PHONE}
+                </p>
+              </div>
+              <button
+                onClick={() => setCurrentPage(Page.HOME)}
+                className="bg-[#2E3192] text-white px-12 py-4 rounded-xl font-bold text-lg hover:shadow-2xl transition-all shadow-lg active:scale-95"
+              >
+                Back to Homepage
+              </button>
+            </div>
+          </section>
+        );
+
       case Page.SUCCESS:
         return (
           <section className="py-32 px-4 text-center animate-fade-in">
@@ -875,8 +1095,8 @@ const App: React.FC = () => {
                   If you have any questions or would like to request any changes, please contact us via email or phone:
                 </p>
                 <p className="font-bold text-[#2E3192]">
-                  Email: atlantanamadwaar@gmail.com<br />
-                  Phone: 404-788-7391
+                  Email: {CONTACT_EMAIL}<br />
+                  Phone: {CONTACT_PHONE}
                 </p>
                 <p className="italic">
                   We look forward to bringing Sri Madhurisakhi Sametha Premikavardan's blessings to your Home!
@@ -895,15 +1115,79 @@ const App: React.FC = () => {
           </section>
         );
 
-      case Page.RESERVATION_OPTIONS:
+      case Page.RESERVATION_CONFIRMATION:
         return (
           <section className="py-12 px-4 bg-gray-50 min-h-screen">
             <div className="container mx-auto max-w-2xl">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                 <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">Manage Reservation</h2>
                 <p className="text-gray-600 mb-8">
-                  Program: <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span>
+                  Enter your confirmation number to find your reservation.
                 </p>
+
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                      Confirmation Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={reservationLookupConfirmationNumber}
+                      onChange={(e) => {
+                        setReservationLookupConfirmationNumber(e.target.value);
+                        setReservationLookupError('');
+                      }}
+                      placeholder="Enter confirmation number"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {reservationLookupError && (
+                  <div className="mt-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+                    {reservationLookupError}
+                  </div>
+                )}
+
+                <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleVerifyReservationByConfirmation}
+                    disabled={isReservationLookupLoading}
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
+                  >
+                    {isReservationLookupLoading ? 'Checking...' : 'Validate Confirmation'}
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Page.HOME)}
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back to Programs
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case Page.RESERVATION_OPTIONS:
+        return (
+          <section className="py-12 px-4 bg-gray-50 min-h-screen">
+            <div className="container mx-auto max-w-2xl">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">Manage Reservation</h2>
+                <p className="text-gray-600 mb-4">
+                  Reservation verified for <span className="font-bold text-[#2E3192]">{selectedProgram?.name || verifiedReservation?.programType}</span>.
+                </p>
+
+                {verifiedReservation && (
+                  <div className="mb-8 p-4 rounded-xl border border-[#2E3192]/20 bg-[#2E3192]/5 space-y-1 text-sm text-gray-700">
+                    <p><strong>Date:</strong> {verifiedReservation.date}</p>
+                    <p><strong>Time:</strong> {verifiedReservation.time || 'N/A'}</p>
+                    <p><strong>Email:</strong> {verifiedReservation.email}</p>
+                    <p><strong>Confirmation:</strong> {verifiedReservation.confirmationNumber}</p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <button
                     onClick={() => handleSelectReservationMode('edit')}
@@ -920,10 +1204,16 @@ const App: React.FC = () => {
                 </div>
                 <div className="mt-8 flex justify-center">
                   <button
-                    onClick={() => setCurrentPage(Page.HOME)}
+                    onClick={() => {
+                      setReservationLookupError('');
+                      setVerifiedReservation(null);
+                      setReservationMode(null);
+                      setReservationLookupConfirmationNumber('');
+                      setCurrentPage(Page.RESERVATION_CONFIRMATION);
+                    }}
                     className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
-                    Back to Programs
+                    Use Different Confirmation
                   </button>
                 </div>
               </div>
@@ -932,99 +1222,48 @@ const App: React.FC = () => {
         );
 
       case Page.RESERVATION_LOOKUP:
+        if (!verifiedReservation) {
+          return (
+            <section className="py-12 px-4 bg-gray-50 min-h-screen">
+              <div className="container mx-auto max-w-2xl">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                  <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">Cancel Reservation</h2>
+                  <p className="text-gray-600 mb-8">Please validate your confirmation number first.</p>
+                  <button
+                    onClick={() => setCurrentPage(Page.RESERVATION_CONFIRMATION)}
+                    className="px-6 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all"
+                  >
+                    Go to Confirmation
+                  </button>
+                </div>
+              </div>
+            </section>
+          );
+        }
+
         return (
           <section className="py-12 px-4 bg-gray-50 min-h-screen">
             <div className="container mx-auto max-w-2xl">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                 <h2 className="text-3xl font-bold text-[#2E3192] serif mb-2">
-                  {reservationMode === 'edit' ? 'Edit Reservation' : 'Cancel Reservation'}
+                  Cancel Reservation
                 </h2>
                 <p className="text-gray-600 mb-8">
-                  Enter your reservation details for <span className="font-bold text-[#2E3192]">{selectedProgram?.name}</span>.
+                  Review your reservation and confirm cancellation.
                 </p>
-
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
-                      Program Date *
-                    </label>
-                    <input
-                      type="date"
-                      value={reservationLookupDate}
-                      onChange={(e) => {
-                        setReservationLookupDate(e.target.value);
-                        setReservationLookupTime('');
-                        setVerifiedReservation(null);
-                        setReservationLookupError('');
-                      }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
-                    />
-                  </div>
-
-                  {reservationMode === 'edit' && (
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
-                        Time Slot *
-                      </label>
-                      <select
-                        value={reservationLookupTime}
-                        onChange={(e) => {
-                          setReservationLookupTime(e.target.value);
-                          setVerifiedReservation(null);
-                          setReservationLookupError('');
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
-                        disabled={!reservationLookupDate}
-                      >
-                        <option value="">
-                          {reservationLookupDate
-                            ? (reservationLookupTimeOptions.length > 0
-                                ? 'Select a time slot'
-                                : 'No slots found for selected date')
-                            : 'Select program date first'}
-                        </option>
-                        {reservationLookupTimeOptions.map((slot) => (
-                          <option key={slot} value={slot}>
-                            {slot}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={reservationLookupEmail}
-                      onChange={(e) => {
-                        setReservationLookupEmail(e.target.value);
-                        setVerifiedReservation(null);
-                        setReservationLookupError('');
-                      }}
-                      placeholder="email@example.com"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wider">
-                      Confirmation Number *
-                    </label>
-                    <input
-                      type="text"
-                      value={reservationLookupConfirmationNumber}
-                      onChange={(e) => {
-                        setReservationLookupConfirmationNumber(e.target.value);
-                        setVerifiedReservation(null);
-                        setReservationLookupError('');
-                      }}
-                      placeholder="Enter confirmation number"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2E3192] focus:border-transparent"
-                    />
-                  </div>
+                <div className="p-4 rounded-xl border border-[#2E3192]/20 bg-[#2E3192]/5">
+                  <h4 className="text-sm uppercase tracking-widest text-gray-500 font-bold mb-2">Reservation Found</h4>
+                  <p className="text-sm text-gray-700"><strong>Date:</strong> {verifiedReservation.date}</p>
+                  <p className="text-sm text-gray-700"><strong>Time:</strong> {verifiedReservation.time || 'N/A'}</p>
+                  <p className="text-sm text-gray-700"><strong>Email:</strong> {verifiedReservation.email}</p>
+                  <p className="text-sm text-gray-700"><strong>Confirmation:</strong> {verifiedReservation.confirmationNumber}</p>
+                  <button
+                    onClick={handleReservationCancelSubmit}
+                    disabled={isReservationSubmitting}
+                    className="mt-4 w-full px-4 py-3 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition-all disabled:opacity-60"
+                  >
+                    {isReservationSubmitting ? 'Cancelling...' : 'Confirm Cancel Reservation'}
+                  </button>
                 </div>
 
                 {reservationLookupError && (
@@ -1033,31 +1272,7 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                {verifiedReservation && reservationMode === 'cancel' && (
-                  <div className="mt-6 p-4 rounded-xl border border-[#2E3192]/20 bg-[#2E3192]/5">
-                    <h4 className="text-sm uppercase tracking-widest text-gray-500 font-bold mb-2">Reservation Found</h4>
-                    <p className="text-sm text-gray-700"><strong>Date:</strong> {verifiedReservation.date}</p>
-                    <p className="text-sm text-gray-700"><strong>Time:</strong> {verifiedReservation.time}</p>
-                    <p className="text-sm text-gray-700"><strong>Email:</strong> {verifiedReservation.email}</p>
-                    <p className="text-sm text-gray-700"><strong>Confirmation:</strong> {verifiedReservation.confirmationNumber}</p>
-                    <button
-                      onClick={handleReservationCancelSubmit}
-                      disabled={isReservationSubmitting}
-                      className="mt-4 w-full px-4 py-3 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition-all disabled:opacity-60"
-                    >
-                      {isReservationSubmitting ? 'Cancelling...' : 'Confirm Cancel Reservation'}
-                    </button>
-                  </div>
-                )}
-
                 <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleVerifyReservation}
-                    disabled={isReservationLookupLoading || isReservationSubmitting}
-                    className="w-full sm:w-auto px-6 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all disabled:opacity-60"
-                  >
-                    {isReservationLookupLoading ? 'Checking...' : 'Find Reservation'}
-                  </button>
                   <button
                     onClick={() => setCurrentPage(Page.RESERVATION_OPTIONS)}
                     className="w-full sm:w-auto px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -1142,7 +1357,7 @@ const App: React.FC = () => {
                     {isReservationSubmitting ? 'Updating...' : 'Submit Update'}
                   </button>
                   <button
-                    onClick={() => setCurrentPage(Page.RESERVATION_LOOKUP)}
+                    onClick={() => setCurrentPage(Page.RESERVATION_OPTIONS)}
                     className="w-full sm:w-auto px-8 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     Back
@@ -1175,7 +1390,7 @@ const App: React.FC = () => {
                 <button
                   onClick={() => {
                     resetReservationFlow();
-                    setCurrentPage(Page.RESERVATION_OPTIONS);
+                    setCurrentPage(Page.RESERVATION_CONFIRMATION);
                   }}
                   className="px-8 py-3 rounded-lg border border-[#2E3192] text-[#2E3192] font-bold hover:bg-[#2E3192]/5 transition-all"
                 >

@@ -1,5 +1,6 @@
 
 import { TimeSlot } from '../types';
+import { toDateKey } from './dateUtils';
 
 export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
   const day = date.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
@@ -31,13 +32,13 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
       addSlot(16, 0, 19, 0, '3 Hours');
     }
   } else if (programId === 'thirumanjanam') {
-    if (isSunday) {
+    if (isWeekend) {
       addSlot(10, 0, 12, 0, '2 Hours');
       addSlot(10, 15, 12, 15, '2 Hours');
       addSlot(10, 30, 12, 30, '2 Hours');
     }
   } else if (programId === 'nikunja-utsavam') {
-    if (isSunday) {
+    if (isWeekend) {
       // Morning window: 10:00 - 12:30
       // 1.5h slots
       addSlot(10, 0, 11, 30, '1.5 Hours');
@@ -129,14 +130,17 @@ export const isDateSelectable = (programId: string, date: Date, bookedDates: str
     return false;
   }
 
-  const dateStr = date.toLocaleDateString('en-CA');
+  const dateStr = toDateKey(date);
   if (bookedDates.includes(dateStr)) {
     return false;
   }
 
   const day = date.getDay();
-  if (programId === 'radha-kalyanam' || programId === 'nikunja-utsavam' || programId === 'thirumanjanam') {
+  if (programId === 'radha-kalyanam') {
     return day === 0;
+  }
+  if (programId === 'nikunja-utsavam' || programId === 'thirumanjanam') {
+    return day === 0 || day === 6;
   }
   if (programId === 'nama-ruchi') {
     return day === 0 || day === 6 || day === 5;

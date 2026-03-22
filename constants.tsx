@@ -1,14 +1,4 @@
-import React from 'react';
 import { DevotionalProgram } from './types';
-
-export const COLORS = {
-  primary: '#2E3192', // Deep Blue from GOD logo
-  secondary: '#FFCC00', // Golden Yellow from GOD logo background
-  accent: '#E63946', // Flame color
-  light: '#F8F9FA',
-  text: '#1F2937',
-  zelle: '#6d1ed1', // Zelle Purple
-};
 
 export const ZELLE_EMAIL = 'atlanta@godivinity.org';
 
@@ -16,7 +6,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'radha-kalyanam',
     name: 'Radha Kalyanam',
-    description: 'Sri Radha and Krishna, accompanied by Atlanta Namadwaar Bhagavathas, celebrate their divine marrriage in a devotional ceremony that\'s filled with bhajans and prayers!',
+    description: 'Sri Radha and Krishna, accompanied by Atlanta Namadwaar Bhagavathas, celebrate their divine marriage in a devotional ceremony that\'s filled with bhajans and prayers!',
     duration: '3 Hours',
     icon: 'fa-hands-praying',
     videoUrl: 'https://youtube.com/shorts/C2lnjuv50Zw?si=-1eiWMtvjzvxEYre',
@@ -30,7 +20,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nikunja-utsavam',
     name: 'Nikunja Utsavam',
-    description: 'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at it\'s peak!',
+    description: 'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at its peak!',
     duration: '2 Hours',
     icon: 'fa-sun',
     donationAmount: '$401',
@@ -56,7 +46,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nama-ruchi',
     name: 'Nama Ruchi',
-    description: 'Invite Sri Radha and Krishna to your home for an exhiliarating session of Mahamantra Kirtan!',
+    description: 'Invite Sri Radha and Krishna to your home for an exhilarating session of Mahamantra Kirtan!',
     duration: '1 Hour',
     icon: 'fa-music',
     videoUrl: 'https://youtube.com/shorts/qBFfZkudf-4?si=7nb9eUqYKdVZlNmW',

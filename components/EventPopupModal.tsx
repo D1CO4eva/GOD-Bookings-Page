@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { resolvePublicAssetUrl } from '../utils/assetUtils';
 
 interface EventPopupModalProps {
   isOpen: boolean;
@@ -7,7 +8,9 @@ interface EventPopupModalProps {
 }
 
 const REGISTRATION_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSecoUraNUKuSLpstLavzvx7NFJjLzaP0tGrBQZzcSoqXSirQQ/viewform';
-const FLYER_IMAGE_URL = '/event-flyers/sri-dhruva-charithram-katha-kacheri-fundraiser.jpg';
+const FLYER_IMAGE_PATH = '/event-flyers/sri-dhruva-charithram-katha-kacheri-fundraiser.jpg';
+
+const FLYER_IMAGE_URL = resolvePublicAssetUrl(FLYER_IMAGE_PATH);
 
 const EventPopupModal: React.FC<EventPopupModalProps> = ({ isOpen, openInFullView = false, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -93,7 +96,7 @@ const EventPopupModal: React.FC<EventPopupModalProps> = ({ isOpen, openInFullVie
             <div className="rounded-xl border border-[#2E3192]/20 bg-[#2E3192]/5 px-4 py-3 text-gray-800 mb-5 text-sm md:text-base leading-relaxed">
               <p><span className="font-bold">Date:</span> March 21st, 2026</p>
               <p><span className="font-bold">Time:</span> 10:30 AM - 12:30 PM</p>
-              <p><span className="font-bold">Venue:</span> 4980 Pittman Rd, Cumming, GA 30040</p>
+              <p><span className="font-bold">Venue:</span> 239 Atlanta Rd, Cumming, GA</p>
               <p><span className="font-bold">Minimum Ticket:</span> $25 per person (Additional contributions are welcome and appreciated)</p>
             </div>
 

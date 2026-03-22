@@ -10,7 +10,13 @@ const RESERVATION_VERIFY_ENDPOINT = `${API_BASE}/api/reservations/verify`;
 const RESERVATION_UPDATE_ENDPOINT = `${API_BASE}/api/reservations/update`;
 const RESERVATION_DELETE_ENDPOINT = `${API_BASE}/api/reservations/delete`;
 
-export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> => {
+export interface BookingSubmitResult {
+  success: boolean;
+  status: number | null;
+  message?: string;
+}
+
+export const submitToGoogleSheets = async (data: BookingData): Promise<BookingSubmitResult> => {
   try {
     const payload: Record<string, string> = {
       'Date': data.date,
@@ -33,10 +39,33 @@ export const submitToGoogleSheets = async (data: BookingData): Promise<boolean> 
       body: JSON.stringify(payload),
     });
 
-    return response.ok;
+    const text = await response.text();
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+
+    const hasSuccessFlag = typeof json?.success === 'boolean';
+    const isSuccessful = response.ok && hasSuccessFlag && json.success === true;
+    const message =
+      (typeof json?.message === 'string' && json.message) ||
+      (typeof json?.error === 'string' && json.error) ||
+      undefined;
+
+    return {
+      success: isSuccessful,
+      status: response.status,
+      message
+    };
   } catch (error) {
     console.error('Error submitting booking:', error);
-    return false;
+    return {
+      success: false,
+      status: null,
+      message: 'Network error while submitting booking.'
+    };
   }
 };
 
@@ -285,6 +314,108 @@ const parseJsonResponse = async (response: Response): Promise<any> => {
   }
 };
 
+const toTrimmedString = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  return '';
+};
+
+const pickFirstString = (...values: unknown[]): string => {
+  for (const value of values) {
+    const normalized = toTrimmedString(value);
+    if (normalized) return normalized;
+  }
+  return '';
+};
+
+const coerceReservationDetails = (
+  source: unknown,
+  fallbackConfirmation: string
+): ReservationDetails | null => {
+  if (!source || typeof source !== 'object') return null;
+
+  const obj = source as Record<string, unknown>;
+  const rawDate = pickFirstString(
+    obj.date,
+    obj.Date,
+    obj.programDate,
+    obj.program_date,
+    obj['Program Date'],
+    obj['Date of Program']
+  );
+  const normalizedDate = normalizeDateString(rawDate);
+  const programType = pickFirstString(
+    obj.programType,
+    obj.program_type,
+    obj.type,
+    obj.Type,
+    obj['Type of Program'],
+    obj['Program Type']
+  );
+  const time = pickFirstString(
+    obj.time,
+    obj.Time,
+    obj.programTime,
+    obj.program_time,
+    obj['Time Slot']
+  );
+  const email = pickFirstString(
+    obj.email,
+    obj.Email,
+    obj.hostEmail,
+    obj.host_email,
+    obj['Host email'],
+    obj['Host Email'],
+    obj['Email Address']
+  );
+  const confirmationNumber = pickFirstString(
+    obj.confirmationNumber,
+    obj.confirmation_number,
+    obj.confirmation,
+    obj.Confirmation,
+    obj['Confirmation Number'],
+    obj['confirmation number'],
+    fallbackConfirmation
+  );
+  const occasion = pickFirstString(obj.occasion, obj.Occasion, obj['Occasion']);
+
+  if (!normalizedDate || !programType || !email) {
+    return null;
+  }
+
+  return {
+    programType,
+    date: normalizedDate,
+    time,
+    email,
+    confirmationNumber,
+    occasion
+  };
+};
+
+const fallbackReservationFromBookings = async (
+  confirmationNumber: string
+): Promise<ReservationDetails | null> => {
+  const normalizedConfirmation = confirmationNumber.trim().toLowerCase();
+  if (!normalizedConfirmation) return null;
+
+  const bookings = await fetchBookings();
+  const match = bookings.find(
+    (booking) => (booking.confirmationNumber || '').trim().toLowerCase() === normalizedConfirmation
+  );
+  if (!match) return null;
+
+  if (!match.date || !match.type || !match.email) return null;
+  return {
+    programType: match.type,
+    date: match.date,
+    time: match.time || '',
+    email: match.email,
+    confirmationNumber: match.confirmationNumber || confirmationNumber,
+    occasion: match.occasion || ''
+  };
+};
+
 export const verifyReservation = async (
   lookup: ReservationLookupData
 ): Promise<{ found: boolean; reservation?: ReservationDetails; message?: string }> => {
@@ -306,10 +437,38 @@ export const verifyReservation = async (
       };
     }
 
+    const reservationPayload =
+      json?.reservation ||
+      json?.data?.reservation ||
+      json?.booking ||
+      json?.data?.booking ||
+      json?.result ||
+      json?.data;
+    const message = pickFirstString(json?.message, json?.error);
+    const messageLower = message.toLowerCase();
+    const messageImpliesFound =
+      (messageLower.includes('booking exists') || messageLower.includes('reservation exists')) &&
+      !messageLower.includes('not');
+    const explicitFound = [
+      json?.found,
+      json?.exists,
+      json?.reservationFound,
+      json?.data?.found,
+      json?.data?.exists,
+      json?.success
+    ].some((value) => value === true);
+    let reservation =
+      coerceReservationDetails(reservationPayload, lookup.confirmationNumber) ||
+      coerceReservationDetails(json, lookup.confirmationNumber);
+
+    if (!reservation && (explicitFound || messageImpliesFound)) {
+      reservation = await fallbackReservationFromBookings(lookup.confirmationNumber);
+    }
+
     return {
-      found: Boolean(json?.found),
-      reservation: json?.reservation,
-      message: json?.message
+      found: explicitFound || Boolean(reservation) || messageImpliesFound,
+      reservation: reservation || undefined,
+      message: message || undefined
     };
   } catch (error) {
     console.error('Error verifying reservation:', error);
@@ -328,17 +487,45 @@ export const updateReservation = async (payload: {
   };
 }): Promise<{ success: boolean; message?: string }> => {
   try {
+    const compatibilityPayload = {
+      ...payload,
+      confirmationNumber: payload.lookup.confirmationNumber,
+      programType: payload.lookup.programType,
+      date: payload.lookup.date,
+      time: payload.lookup.time,
+      email: payload.lookup.email,
+      newDate: payload.updates.newDate,
+      newTime: payload.updates.newTime,
+      confirmation_number: payload.lookup.confirmationNumber,
+      program_type: payload.lookup.programType,
+      new_date: payload.updates.newDate,
+      new_time: payload.updates.newTime
+    };
+
     const response = await fetch(RESERVATION_UPDATE_ENDPOINT, {
       method: 'POST',
       cache: 'no-cache',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(compatibilityPayload)
     });
 
     const json = await parseJsonResponse(response);
+    const successFlag =
+      json?.success === true ||
+      json?.updated === true ||
+      json?.ok === true ||
+      json?.data?.success === true;
+
     if (!response.ok) {
+      return {
+        success: false,
+        message: json?.message || json?.error || 'Failed to update reservation.'
+      };
+    }
+
+    if (json && typeof json === 'object' && !successFlag && (json?.message || json?.error)) {
       return {
         success: false,
         message: json?.message || json?.error || 'Failed to update reservation.'
@@ -356,17 +543,37 @@ export const cancelReservation = async (
   lookup: ReservationLookupData
 ): Promise<{ success: boolean; message?: string }> => {
   try {
+    const compatibilityPayload = {
+      ...lookup,
+      lookup,
+      confirmation_number: lookup.confirmationNumber,
+      program_type: lookup.programType
+    };
+
     const response = await fetch(RESERVATION_DELETE_ENDPOINT, {
       method: 'POST',
       cache: 'no-cache',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(lookup)
+      body: JSON.stringify(compatibilityPayload)
     });
 
     const json = await parseJsonResponse(response);
+    const successFlag =
+      json?.success === true ||
+      json?.deleted === true ||
+      json?.ok === true ||
+      json?.data?.success === true;
+
     if (!response.ok) {
+      return {
+        success: false,
+        message: json?.message || json?.error || 'Failed to cancel reservation.'
+      };
+    }
+
+    if (json && typeof json === 'object' && !successFlag && (json?.message || json?.error)) {
       return {
         success: false,
         message: json?.message || json?.error || 'Failed to cancel reservation.'

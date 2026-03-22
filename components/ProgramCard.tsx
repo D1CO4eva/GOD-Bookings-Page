@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DevotionalProgram } from '../types';
 import { PROGRAM_IMAGE_MANIFEST } from '../generated/programImageManifest';
+import { resolvePublicAssetUrl } from '../utils/assetUtils';
+import { getProgramAvailabilityFlags } from '../utils/programUtils';
 
 interface ProgramCardProps {
   program: DevotionalProgram;
@@ -10,12 +12,12 @@ interface ProgramCardProps {
 }
 
 const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, onManageReservation }) => {
+  const availabilityFlags = useMemo(() => getProgramAvailabilityFlags(program.id), [program.id]);
+
   const imageUrls = useMemo(() => {
     const folderImages = PROGRAM_IMAGE_MANIFEST[program.id] || [];
-    if (folderImages.length > 0) {
-      return folderImages;
-    }
-    return program.imageUrl ? [program.imageUrl] : [];
+    const rawUrls = folderImages.length > 0 ? folderImages : program.imageUrl ? [program.imageUrl] : [];
+    return rawUrls.map(resolvePublicAssetUrl);
   }, [program.id, program.imageUrl]);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -38,8 +40,12 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, on
     };
   }, [imageUrls]);
 
+  const checklistHref = program.checklist ? resolvePublicAssetUrl(program.checklist.href) : '';
+
   const openChecklistPreview = (href: string) => {
-    const absoluteUrl = new URL(href, window.location.origin).toString();
+    const absoluteUrl = /^(https?:)?\/\//i.test(href)
+      ? href
+      : new URL(href, window.location.origin).toString();
     const ext = href.split('.').pop()?.toLowerCase();
 
     // Use a web document viewer for Office files so preview opens in-browser.
@@ -72,6 +78,19 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, on
         </div>
         
         <h3 className="text-2xl font-bold text-[#2E3192] mb-3 serif">{program.name}</h3>
+        {availabilityFlags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {availabilityFlags.map((flag) => (
+              <span
+                key={flag}
+                className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-[#2E3192]"
+              >
+                <i className="fas fa-flag mr-1"></i>
+                {flag}
+              </span>
+            ))}
+          </div>
+        )}
         <p className="text-gray-600 mb-6 leading-relaxed italic">"{program.description}"</p>
         
         {program.donationAmount && (
@@ -115,7 +134,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, on
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();
-                    openChecklistPreview(program.checklist!.href);
+                    openChecklistPreview(checklistHref);
                   }}
                   title="View checklist"
                   aria-label={`View ${program.name} checklist`}
@@ -124,7 +143,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onBook, onDonate, on
                   <i className="fas fa-eye text-xs"></i>
                 </a>
                 <a
-                  href={program.checklist.href}
+                  href={checklistHref}
                   download
                   title="Download checklist"
                   aria-label={`Download ${program.name} checklist`}

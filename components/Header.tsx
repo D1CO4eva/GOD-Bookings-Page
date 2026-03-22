@@ -1,6 +1,5 @@
 import React from 'react';
 import { Page } from '../types';
-import { COLORS } from '../constants';
 
 interface HeaderProps {
   onNavigate: (page: Page) => void;
@@ -9,12 +8,16 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, onOpenDonate }) => {
+  const goToMainSite = () => {
+    window.location.href = 'https://atlanta.godivinity.org';
+  };
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
         <div 
           className="flex items-center space-x-3 cursor-pointer" 
-          onClick={() => onNavigate(Page.HOME)}
+          onClick={goToMainSite}
         >
           <div className="w-14 h-14 flex items-center justify-center">
             <img
@@ -31,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, onOpenDonate }
         
         <nav className="flex items-center space-x-1 sm:space-x-4 text-sm md:text-base">
           <button 
-            onClick={() => onNavigate(Page.HOME)}
+            onClick={goToMainSite}
             className={`px-3 py-1 rounded-full transition ${currentPage === Page.HOME ? 'bg-[#2E3192] text-white' : 'text-[#2E3192] hover:bg-gray-100'}`}
           >
             Home

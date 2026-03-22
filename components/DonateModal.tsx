@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ZELLE_EMAIL, COLORS } from '../constants';
+import { ZELLE_EMAIL } from '../constants';
 
 interface DonateModalProps {
   isOpen: boolean;

@@ -19,8 +19,11 @@ export enum Page {
   HOME = 'home',
   BOOKING_CALENDAR = 'booking_calendar',
   BOOKING_FORM = 'booking_form',
+  BOOKING_PROCESSING = 'booking_processing',
+  BOOKING_FAILED = 'booking_failed',
   SUCCESS = 'success',
   INSTRUCTIONS = 'instructions',
+  RESERVATION_CONFIRMATION = 'reservation_confirmation',
   RESERVATION_OPTIONS = 'reservation_options',
   RESERVATION_LOOKUP = 'reservation_lookup',
   RESERVATION_EDIT = 'reservation_edit',
@@ -60,14 +63,18 @@ export interface BookingRecord {
 }
 
 export interface ReservationLookupData {
+  confirmationNumber: string;
+  programType?: string;
+  date?: string;
+  time?: string;
+  email?: string;
+}
+export interface ReservationDetails {
   programType: string;
   date: string;
-  time?: string;
+  time: string;
   email: string;
   confirmationNumber: string;
-}
-export interface ReservationDetails extends ReservationLookupData {
-  time: string;
   occasion?: string;
 }
 
