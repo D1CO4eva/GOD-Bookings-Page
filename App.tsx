@@ -1414,9 +1414,19 @@ const App: React.FC = () => {
             <div className="container mx-auto max-w-5xl">
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-bold text-[#2E3192] serif">Choose a new Date and Time for your Reservation!</h2>
-                <p className="text-gray-500">
-                  Current: {verifiedReservation?.date} {verifiedReservation?.time ? `(${verifiedReservation.time})` : ''}
-                </p>
+                <div className="mt-4 max-w-xl mx-auto rounded-2xl border border-[#2E3192]/20 bg-white shadow-sm px-5 py-4 text-left">
+                  <p className="text-xs uppercase tracking-widest text-[#2E3192] font-bold">Current Reservation</p>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-[#2E3192]/5 border border-[#2E3192]/10 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Date</p>
+                      <p className="text-lg font-bold text-[#2E3192]">{verifiedReservation?.date || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg bg-[#2E3192]/5 border border-[#2E3192]/10 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Time</p>
+                      <p className="text-lg font-bold text-[#2E3192]">{verifiedReservation?.time || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
