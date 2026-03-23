@@ -11,9 +11,14 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build",
     "build": "vite build",
-    "preview": "vite preview"
+    "postbuild": "node scripts/postBuildCleanup.mjs",
+    "preview": "vite preview",
+    "deploy:ftps": "npm run build && node scripts/deployFtps.mjs",
+    "deploy:ftps:only": "node scripts/deployFtps.mjs"
   },
   "dependencies": {
+    "basic-ftp": "^5.0.5",
+    "dotenv": "^16.6.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

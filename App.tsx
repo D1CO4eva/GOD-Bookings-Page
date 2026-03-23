@@ -6,7 +6,6 @@ import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
-import EventPopupModal from './components/EventPopupModal';
 import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot, ReservationLookupData, ReservationDetails } from './types';
 import { PROGRAMS } from './constants';
 import { fetchBookings, submitToGoogleSheets, verifyReservation, updateReservation, cancelReservation } from './services/googleSheetsService';
@@ -26,6 +25,44 @@ import {
 import { getPathForPage, parsePathToPage } from './utils/routeUtils';
 const CONTACT_EMAIL = 'atlantanamadwaar@gmail.com';
 const CONTACT_PHONE = '404-788-7391';
+type ReservationActionLinkMode = 'edit' | 'cancel';
+
+const normalizeReservationActionLinkMode = (
+  value: string | null
+): ReservationActionLinkMode | null => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'edit' || normalized === 'cancel') {
+    return normalized;
+  }
+  return null;
+};
+
+const parseReservationActionLink = (
+  pathname: string,
+  search: string
+): { confirmationNumber: string; action: ReservationActionLinkMode | null } => {
+  const searchParams = new URLSearchParams(search);
+  let action = normalizeReservationActionLinkMode(searchParams.get('action'));
+  let confirmationNumber = (
+    searchParams.get('confirmationNumber') ||
+    searchParams.get('confirmation_number') ||
+    ''
+  ).trim();
+
+  if (!action || !confirmationNumber) {
+    const malformedMatch = pathname.match(
+      /reservationaction=(edit|cancel)&confirmation(?:Number|_number)=([^/?#]+)/i
+    );
+    if (malformedMatch) {
+      action = action || normalizeReservationActionLinkMode(malformedMatch[1]);
+      if (!confirmationNumber) {
+        confirmationNumber = decodeURIComponent(malformedMatch[2] || '').trim();
+      }
+    }
+  }
+
+  return { confirmationNumber, action };
+};
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
@@ -35,8 +72,6 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSubmitError, setBookingSubmitError] = useState('');
   const [isDonateOpen, setIsDonateOpen] = useState(false);
-  const [isEventPopupOpen, setIsEventPopupOpen] = useState(false);
-  const [eventPopupStartInFullView, setEventPopupStartInFullView] = useState(false);
   const [donateTitle, setDonateTitle] = useState<string | undefined>();
   const [donateMessage, setDonateMessage] = useState<string | undefined>();
   
@@ -58,6 +93,11 @@ const App: React.FC = () => {
   const [isReservationSubmitting, setIsReservationSubmitting] = useState(false);
   const [reservationResultMessage, setReservationResultMessage] = useState('');
   const hasAppliedInitialRoute = useRef(false);
+  const hasHandledReservationActionLink = useRef(false);
+  const initialLocationRef = useRef({
+    pathname: window.location.pathname,
+    search: window.location.search
+  });
 
   const resolveProgramTypeForReservationLookup = ({
     programType,
@@ -356,17 +396,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setEventPopupStartInFullView(false);
-      setIsEventPopupOpen(true);
-    }, 3000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!hasAppliedInitialRoute.current) {
       return;
     }
@@ -419,6 +448,106 @@ const App: React.FC = () => {
       window.removeEventListener('popstate', handlePathChange);
     };
   }, [selectedDate, selectedProgram, selectedSlot, verifiedReservation]);
+
+  useEffect(() => {
+    if (hasHandledReservationActionLink.current) return;
+    if (
+      currentPage !== Page.RESERVATION_CONFIRMATION &&
+      currentPage !== Page.RESERVATION_OPTIONS
+    ) {
+      return;
+    }
+
+    const initialPath = initialLocationRef.current.pathname;
+    const initialSearch = initialLocationRef.current.search;
+    const initialRoute = parsePathToPage(initialPath);
+    const deepLinkLooksLikeReservationAction =
+      initialRoute.page === Page.RESERVATION_OPTIONS || initialPath.includes('reservationaction=');
+
+    if (!deepLinkLooksLikeReservationAction) return;
+
+    const parsedLink = parseReservationActionLink(initialPath, initialSearch);
+    if (!parsedLink.action || !parsedLink.confirmationNumber) return;
+
+    hasHandledReservationActionLink.current = true;
+
+    const normalizedConfirmation = normalizeConfirmationForMatch(parsedLink.confirmationNumber);
+    if (!normalizedConfirmation) return;
+
+    setReservationLookupConfirmationNumber(parsedLink.confirmationNumber);
+    setIsReservationLookupLoading(true);
+    setReservationLookupError('');
+
+    let isMounted = true;
+    const runAutoReservationAction = async () => {
+      const result = await verifyReservation({
+        confirmationNumber: parsedLink.confirmationNumber
+      });
+
+      if (!isMounted) return;
+      setIsReservationLookupLoading(false);
+
+      if (!result.found || !result.reservation) {
+        setVerifiedReservation(null);
+        setReservationMode(null);
+        setCurrentPage(Page.RESERVATION_CONFIRMATION);
+        setReservationLookupError(result.message || 'Sorry! Could not find your Reservation! Please try again.');
+        return;
+      }
+
+      if (!result.reservation.date || !result.reservation.programType || !result.reservation.email) {
+        setVerifiedReservation(null);
+        setReservationMode(null);
+        setCurrentPage(Page.RESERVATION_CONFIRMATION);
+        setReservationLookupError(
+          'Found reservation, but required details are incomplete. Please contact support.'
+        );
+        return;
+      }
+
+      const resolvedProgram = resolveProgramByType(result.reservation.programType, PROGRAMS);
+      if (resolvedProgram) {
+        setSelectedProgram(resolvedProgram);
+      }
+
+      const verifiedDetails = {
+        programType: result.reservation.programType,
+        date: result.reservation.date,
+        time: result.reservation.time || '',
+        email: result.reservation.email,
+        confirmationNumber:
+          result.reservation.confirmationNumber || parsedLink.confirmationNumber,
+        occasion: result.reservation.occasion || ''
+      };
+
+      setVerifiedReservation(verifiedDetails);
+      setReservationLookupConfirmationNumber(verifiedDetails.confirmationNumber);
+      setReservationLookupDate('');
+      setReservationLookupTime('');
+      setReservationLookupEmail('');
+      setReservationLookupError('');
+      setReservationEditTime('');
+
+      if (parsedLink.action === 'edit') {
+        const currentDate = new Date(`${verifiedDetails.date}T00:00:00`);
+        setReservationMode('edit');
+        setReservationEditDate(Number.isNaN(currentDate.getTime()) ? null : currentDate);
+        setCurrentPage(Page.RESERVATION_EDIT);
+      } else {
+        setReservationMode('cancel');
+        setReservationEditDate(null);
+        setCurrentPage(Page.RESERVATION_LOOKUP);
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    void runAutoReservationAction();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentPage]);
 
   const handleProgramSelect = (program: DevotionalProgram) => {
     setSelectedProgram(program);
@@ -827,17 +956,6 @@ const App: React.FC = () => {
                     >
                       <i className="fas fa-heart"></i>
                       <span>Donate Here</span>
-                    </button>
-                  </div>
-                  <div className="mt-4">
-                    <button
-                      onClick={() => {
-                        setEventPopupStartInFullView(true);
-                        setIsEventPopupOpen(true);
-                      }}
-                      className="w-full sm:w-auto bg-white/10 text-white border-2 border-white/30 px-8 py-3 rounded-full font-semibold text-base hover:bg-white hover:text-[#2E3192] transition-all shadow-md active:scale-95"
-                    >
-                      View Fundraiser Event
                     </button>
                   </div>
                </div>
@@ -1483,14 +1601,6 @@ const App: React.FC = () => {
         onClose={() => setIsDonateOpen(false)} 
         title={donateTitle}
         message={donateMessage}
-      />
-      <EventPopupModal
-        isOpen={isEventPopupOpen}
-        openInFullView={eventPopupStartInFullView}
-        onClose={() => {
-          setIsEventPopupOpen(false);
-          setEventPopupStartInFullView(false);
-        }}
       />
       <Footer />
     </div>

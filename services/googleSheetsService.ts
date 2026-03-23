@@ -328,6 +328,19 @@ const pickFirstString = (...values: unknown[]): string => {
   return '';
 };
 
+const buildVerifyReservationEndpoint = (lookup: ReservationLookupData): string => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(lookup)) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    params.set(key, trimmed);
+  }
+
+  const query = params.toString();
+  return query ? `${RESERVATION_VERIFY_ENDPOINT}?${query}` : RESERVATION_VERIFY_ENDPOINT;
+};
+
 const coerceReservationDetails = (
   source: unknown,
   fallbackConfirmation: string
@@ -420,13 +433,10 @@ export const verifyReservation = async (
   lookup: ReservationLookupData
 ): Promise<{ found: boolean; reservation?: ReservationDetails; message?: string }> => {
   try {
-    const response = await fetch(RESERVATION_VERIFY_ENDPOINT, {
-      method: 'POST',
-      cache: 'no-cache',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(lookup)
+    const verifyEndpoint = buildVerifyReservationEndpoint(lookup);
+    const response = await fetch(verifyEndpoint, {
+      method: 'GET',
+      cache: 'no-cache'
     });
 
     const json = await parseJsonResponse(response);

@@ -49,6 +49,10 @@ export const parsePathToPage = (
   }
 
   const segment = normalizedPath.slice(normalizedBase.length).replace(/^\/+/, '');
+  if (segment.startsWith('reservationaction')) {
+    return { page: Page.RESERVATION_OPTIONS, reservationMode: null };
+  }
+
   switch (segment) {
     case 'datepicker':
       return { page: Page.BOOKING_CALENDAR, reservationMode: null };
@@ -62,8 +66,6 @@ export const parsePathToPage = (
       return { page: Page.BOOKING_FAILED, reservationMode: null };
     case 'confirmationnumber':
       return { page: Page.RESERVATION_CONFIRMATION, reservationMode: null };
-    case 'reservationaction':
-      return { page: Page.RESERVATION_OPTIONS, reservationMode: null };
     case 'reservationedit':
       return { page: Page.RESERVATION_EDIT, reservationMode: 'edit' };
     case 'reservationcancel':

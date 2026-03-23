@@ -56,3 +56,24 @@ A reset option clears only the locally blocked dates in the current browser sess
 - `npm run typecheck`
 - `npm run build`
 - `npm run check`
+
+## Local Development
+
+- `npm run dev`
+  - Starts local development server on `http://localhost:5000/homebookings/`.
+
+## FTPS Deployment
+
+- `npm run deploy:ftps`
+  - Builds and uploads `dist/` to your FTPS server.
+- `npm run deploy:ftps:only`
+  - Uploads without rebuilding first.
+- Defaults are preconfigured for this project:
+  - Host: `atlanta.godivinity.org`
+  - User: `admin@atlanta.godivinity.org`
+  - Port: `21`
+  - Remote dir: `/homebookings`
+- Set `FTPS_REMOTE_DIR` only if your host requires a different absolute path (for example `/public_html/homebookings`).
+- `dist/.htaccess` is removed automatically after build.
+
+See [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md) for required FTPS environment variables.

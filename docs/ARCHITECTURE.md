@@ -71,7 +71,7 @@ Rules are enforced by `utils/slotUtils.ts` + `App.tsx` checks:
 Flow:
 
 1. User validates confirmation number.
-2. App fetches reservation details via `/api/reservations/verify`.
+2. App fetches reservation details via `GET /api/reservations/verify` with query parameters.
 3. User chooses edit or cancel.
 4. Edit path submits `/api/reservations/update`.
 5. Cancel path submits `/api/reservations/delete`.

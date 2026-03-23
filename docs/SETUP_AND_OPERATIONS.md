@@ -24,15 +24,43 @@ Configured via `.env`/`.env.local`:
 ## Scripts
 
 - `npm run dev`
-  - Starts Vite dev server.
+  - Starts Vite dev server on port `5000`.
 - `npm run build`
   - Regenerates program image manifest, then builds production bundle.
 - `npm run preview`
   - Serves built assets locally.
+- `npm run deploy:ftps`
+  - Builds the app, then uploads `dist/` to your FTPS server.
+- `npm run deploy:ftps:only`
+  - Uploads the configured local directory to your FTPS server without rebuilding first.
 - `npm run typecheck`
   - Runs TypeScript compile checks (`tsc --noEmit`).
 - `npm run check`
   - Runs `typecheck` then `build`.
+
+## FTPS Deployment Environment Variables
+
+Set these in `.env` (or `.env.local`) before running `npm run deploy:ftps`:
+
+- `FTPS_PASSWORD` (required)
+  - FTPS password.
+- `FTPS_HOST` (optional, default: `atlanta.godivinity.org`)
+  - FTPS hostname.
+- `FTPS_USER` (optional, default: `admin@atlanta.godivinity.org`)
+  - FTPS username.
+- `FTPS_REMOTE_DIR` (optional, default: `/homebookings`)
+  - Remote directory where files should be uploaded.
+  - Set this to your exact `homebookings` directory path if your host uses a different root (example: `/public_html/homebookings`).
+- `FTPS_PORT` (optional, default: `21`)
+  - FTPS port.
+- `FTPS_SECURE` (optional, default: `true`)
+  - Use secure FTPS connection (`true`/`false`).
+- `FTPS_LOCAL_DIR` (optional, default: `dist`)
+  - Local directory to upload.
+- `FTPS_CLEAR_REMOTE` (optional, default: `false`)
+  - If `true`, clears remote directory before upload.
+- `FTPS_VERBOSE` (optional, default: `false`)
+  - Enables verbose FTP logs for debugging.
 
 ## Generated Files
 
@@ -44,8 +72,9 @@ Configured via `.env`/`.env.local`:
 
 - Base route is `/homebookings/`; keep this aligned with hosting config.
 - `public/.htaccess` includes Apache rewrite and cache headers.
+- Build output removes `dist/.htaccess` automatically after every build (`postbuild`), assuming rewrite rules already exist at your server root.
 - App expects API endpoints at:
   - `POST /api/bookings`
-  - `POST /api/reservations/verify`
+  - `GET /api/reservations/verify` (lookup values sent as query params)
   - `POST /api/reservations/update`
   - `POST /api/reservations/delete`

@@ -20,12 +20,21 @@
 
 1. User selects "Already have a Reservation?" on a program.
 2. User enters confirmation number.
-3. App verifies reservation via `/api/reservations/verify`.
+3. App verifies reservation via `/api/reservations/verify` using query parameters (no JSON request body).
 4. On success, user chooses "Edit Reservation".
 5. App displays current reservation and available replacement dates/slots.
 6. User submits new date/time.
 7. App calls `/api/reservations/update`.
 8. On success, app refreshes bookings and shows completion page.
+
+## Reservation Email Deep-Link Flow
+
+1. Email link includes confirmation and action:
+  - Preferred: `/homebookings/reservationaction?action=edit&confirmationNumber=...`
+  - Preferred: `/homebookings/reservationaction?action=cancel&confirmationNumber=...`
+2. App auto-validates confirmation number via `/api/reservations/verify`.
+3. On success, app routes directly to edit or cancel based on the `action` query value.
+4. On failure, app falls back to confirmation-number page with an error.
 
 ## Reservation Cancel Flow
 
