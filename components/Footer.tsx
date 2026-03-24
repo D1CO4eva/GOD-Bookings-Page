@@ -1,7 +1,8 @@
-﻿import React from 'react';
+import React, { useState } from 'react';
 
 const Footer: React.FC = () => {
   const year = new Date().getFullYear();
+  const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false);
 
   return (
     <footer className="bg-[#2E3192] text-white py-16">
@@ -53,16 +54,15 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="mb-10 flex justify-center">
-          <a
-            href="https://chat.whatsapp.com/D5dtrHUXkgZADe71UUsHWJ?mode=gi_t"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setIsWhatsappModalOpen(true)}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#25D366] text-[#0f3b1f] font-bold shadow-md hover:brightness-95 transition-all"
             title="Join WhatsApp Community"
           >
             <i className="fab fa-whatsapp text-lg"></i>
             <span>Join WhatsApp Community</span>
-          </a>
+          </button>
         </div>
 
         <div className="mb-10 text-left">
@@ -84,6 +84,53 @@ const Footer: React.FC = () => {
           <p>Global Organization of Divinity</p>
           <p>(c) {year} Atlanta Namadwaar. All rights reserved.</p>
         </div>
+
+        {isWhatsappModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            onClick={() => setIsWhatsappModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="whatsapp-modal-title"
+            >
+              <h3 id="whatsapp-modal-title" className="text-2xl font-bold text-[#2E3192] serif mb-3">
+                WhatsApp Community
+              </h3>
+              <p className="text-gray-700 text-lg leading-relaxed mb-6">
+                Contact our Admin for more details! Radhe Radhe!
+              </p>
+              <div className="mb-6 space-y-1 text-sm">
+                <p>
+                  <a
+                    href="mailto:atlantanamadwaar@gmail.com"
+                    className="font-semibold text-[#2E3192] hover:underline"
+                  >
+                    atlantanamadwaar@gmail.com
+                  </a>
+                </p>
+                <p>
+                  <a
+                    href="tel:+14047887391"
+                    className="font-semibold text-[#2E3192] hover:underline"
+                  >
+                    404-788-7391
+                  </a>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWhatsappModalOpen(false)}
+                className="px-6 py-3 rounded-lg bg-[#2E3192] text-white font-bold hover:bg-indigo-900 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </footer>
   );
