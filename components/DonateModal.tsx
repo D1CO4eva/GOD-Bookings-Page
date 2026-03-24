@@ -28,7 +28,7 @@ const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose, title, messa
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-        <div className="bg-[#6d1ed1] p-8 text-white text-center relative">
+        <div className="bg-[#2E3192] p-8 text-white text-center relative">
           <button 
             onClick={onClose}
             className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
@@ -39,7 +39,7 @@ const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose, title, messa
             <i className="fas fa-hand-holding-heart text-3xl"></i>
           </div>
           <h2 className="text-2xl font-bold serif">{title || 'Support Our Mission'}</h2>
-          <p className="text-purple-100 text-sm mt-2">
+          <p className="text-indigo-100 text-sm mt-2">
             {message || 'Your contribution helps us share divine bliss with everyone.'}
           </p>
         </div>
@@ -48,7 +48,7 @@ const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose, title, messa
           <div className="text-center">
             <p className="text-xs uppercase font-bold text-gray-400 tracking-widest mb-4">Donate via Zelle</p>
             <div className="bg-gray-50 rounded-2xl p-4 border-2 border-dashed border-gray-200 group relative">
-              <p className="text-[#6d1ed1] font-bold text-xl mb-1">{ZELLE_EMAIL}</p>
+              <p className="text-[#2E3192] font-bold text-xl mb-1">{ZELLE_EMAIL}</p>
               <p className="text-gray-400 text-[10px]">Tap email to copy</p>
               <button 
                 onClick={handleCopy}
@@ -69,7 +69,7 @@ const DonateModal: React.FC<DonateModalProps> = ({ isOpen, onClose, title, messa
           <div className="space-y-3">
             <button 
               onClick={handleOpenZelle}
-              className="w-full bg-[#6d1ed1] text-white py-4 rounded-xl font-bold shadow-lg hover:bg-[#5a18b1] transition-all flex items-center justify-center space-x-3 active:scale-95"
+              className="w-full bg-[#2E3192] text-white py-4 rounded-xl font-bold shadow-lg hover:bg-[#24287a] transition-all flex items-center justify-center space-x-3 active:scale-95"
             >
               <i className="fas fa-external-link-alt text-sm"></i>
               <span>Open Zelle App / Site</span>

@@ -926,7 +926,7 @@ const App: React.FC = () => {
           <>
             <section className="relative bg-[#2E3192] text-white py-20 px-4 overflow-hidden">
                <div className="absolute top-0 right-0 w-96 h-96 bg-[#FFCC00] rounded-full blur-[120px] opacity-20 -mr-32 -mt-32"></div>
-               <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#6d1ed1] rounded-full blur-[100px] opacity-10 -ml-32 -mb-32"></div>
+               <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#24287a] rounded-full blur-[100px] opacity-15 -ml-32 -mb-32"></div>
                <div className="container mx-auto text-center relative z-10">
                   <div className="mb-10 max-w-lg mx-auto transform hover:scale-[1.02] transition-transform duration-500">
                     <img 
@@ -952,7 +952,7 @@ const App: React.FC = () => {
                     </button>
                     <button 
                       onClick={() => setIsDonateOpen(true)}
-                      className="w-full sm:w-auto bg-[#6d1ed1] text-white border-2 border-white/20 px-12 py-5 rounded-full font-bold text-xl hover:bg-[#5a18b1] hover:shadow-2xl hover:scale-105 transition-all shadow-md active:scale-95 flex items-center justify-center space-x-3"
+                      className="w-full sm:w-auto bg-[#2E3192] text-white border-2 border-white/20 px-12 py-5 rounded-full font-bold text-xl hover:bg-[#24287a] hover:shadow-2xl hover:scale-105 transition-all shadow-md active:scale-95 flex items-center justify-center space-x-3"
                     >
                       <i className="fas fa-heart"></i>
                       <span>Donate Here</span>

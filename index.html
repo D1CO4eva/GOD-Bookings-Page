@@ -10,14 +10,24 @@
     <link rel="icon" type="image/jpeg" href="https://godivinity.org/wp-content/uploads/2018/05/GOD-LOGO-1024x617.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+          --ink: #1f2937;
+          --ink-soft: #6b7280;
+          --brand: #2E3192;
+          --brand-deep: #24287a;
+          --gold: #FFCC00;
+          --paper: #f9fafb;
+          --line: #d9deea;
+        }
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #fafafa;
+            font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+            color: var(--ink);
+            background-color: var(--paper);
         }
         h1, h2, h3, .serif {
-            font-family: 'Playfair Display', serif;
+            font-family: 'Cormorant Garamond', Georgia, serif;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -30,11 +40,11 @@
           width: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f1f1;
+          background: var(--line);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #2E3192;
+          background: var(--brand);
           border-radius: 10px;
         }
         .aspect-video {
