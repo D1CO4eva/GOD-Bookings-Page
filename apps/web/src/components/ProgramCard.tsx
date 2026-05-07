@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DevotionalProgram } from '../types';
-import { PROGRAM_IMAGE_MANIFEST } from '../generated/programImageManifest';
+import { PROGRAM_IMAGE_MANIFEST } from '@shared/programImageManifest';
 import { resolvePublicAssetUrl } from '../utils/assetUtils';
 import { getProgramAvailabilityFlags } from '../utils/programUtils';
 

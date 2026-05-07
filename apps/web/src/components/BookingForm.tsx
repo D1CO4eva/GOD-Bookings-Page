@@ -22,10 +22,46 @@ const GOOGLE_PLACES_SCRIPT_ID = 'google-places-api-script';
 
 let googlePlacesScriptPromise: Promise<void> | null = null;
 
+const waitForGooglePlacesApi = async (): Promise<void> => {
+  const win = window as any;
+  if (win.google?.maps?.places) {
+    return;
+  }
+
+  if (win.google?.maps?.importLibrary) {
+    await win.google.maps.importLibrary('places');
+    if (win.google?.maps?.places) {
+      return;
+    }
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const startedAt = Date.now();
+    const check = () => {
+      if (win.google?.maps?.places) {
+        resolve();
+        return;
+      }
+
+      if (Date.now() - startedAt > 5000) {
+        reject(new Error('Google Places API is not available.'));
+        return;
+      }
+
+      window.setTimeout(check, 100);
+    };
+    check();
+  });
+};
+
 const loadGooglePlacesScript = (apiKey: string): Promise<void> => {
   const win = window as any;
   if (win.google?.maps?.places) {
     return Promise.resolve();
+  }
+
+  if (win.google?.maps) {
+    return waitForGooglePlacesApi();
   }
 
   if (!apiKey) {
@@ -57,7 +93,12 @@ const loadGooglePlacesScript = (apiKey: string): Promise<void> => {
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load Google Places script'));
     document.head.appendChild(script);
-  });
+  })
+    .then(waitForGooglePlacesApi)
+    .catch((error) => {
+      googlePlacesScriptPromise = null;
+      throw error;
+    });
 
   return googlePlacesScriptPromise;
 };

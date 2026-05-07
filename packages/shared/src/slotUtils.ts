@@ -1,9 +1,41 @@
-
-import { TimeSlot } from '../types';
+import { TimeSlot } from './types';
 import { toDateKey } from './dateUtils';
 
+const EVENING_SLOT_START_HOUR = 16;
+const EVENING_SLOT_START_MINUTES = EVENING_SLOT_START_HOUR * 60;
+
+export const toSlotLabel = (slot: TimeSlot): string => `${slot.start} - ${slot.end}`;
+
+const parseTimeToMinutes = (value: string): number | null => {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  const rawHours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3].toUpperCase();
+
+  if (rawHours < 1 || rawHours > 12 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  let hours = rawHours % 12;
+  if (period === 'PM') {
+    hours += 12;
+  }
+
+  return hours * 60 + minutes;
+};
+
+export const isSatsangBlockedSlot = (slot: TimeSlot): boolean => {
+  const startMinutes = parseTimeToMinutes(slot.start);
+  if (startMinutes === null) {
+    return slot.period === 'Evening';
+  }
+  return startMinutes >= EVENING_SLOT_START_MINUTES;
+};
+
 export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
-  const day = date.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+  const day = date.getDay();
   const isWeekend = day === 0 || day === 6;
   const isSunday = day === 0;
   const isFriday = day === 5;
@@ -17,7 +49,7 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
       return `${hours}:${mins} ${period}`;
     };
 
-    const period: 'Morning' | 'Evening' = startH < 12 ? 'Morning' : 'Evening';
+    const period: 'Morning' | 'Evening' = startH >= EVENING_SLOT_START_HOUR ? 'Evening' : 'Morning';
     slots.push({
       start: formatTime(startH, startM),
       end: formatTime(endH, endM),
@@ -39,16 +71,12 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
     }
   } else if (programId === 'nikunja-utsavam') {
     if (isWeekend) {
-      // Morning window: 10:00 - 12:30
-      // 1.5h slots
       addSlot(10, 0, 11, 30, '1.5 Hours');
       addSlot(10, 30, 12, 0, '1.5 Hours');
       addSlot(11, 0, 12, 30, '1.5 Hours');
-      // 2h slots
       addSlot(10, 0, 12, 0, '2 Hours');
       addSlot(10, 30, 12, 30, '2 Hours');
 
-      // Evening window: 4:00 - 7:00
       addSlot(16, 0, 17, 30, '1.5 Hours');
       addSlot(16, 30, 18, 0, '1.5 Hours');
       addSlot(17, 0, 18, 30, '1.5 Hours');
@@ -61,7 +89,6 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
     const valid = isWeekend || isFriday;
     if (valid) {
       if (isWeekend) {
-        // Morning 10:00 - 12:30 (1h, 1.5h, and 2h)
         addSlot(10, 0, 11, 0, '1 Hour');
         addSlot(10, 30, 11, 30, '1 Hour');
         addSlot(11, 0, 12, 0, '1 Hour');
@@ -72,7 +99,6 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
         addSlot(10, 0, 12, 0, '2 Hours');
         addSlot(10, 30, 12, 30, '2 Hours');
       }
-      // Evening 4:00 - 7:00 (1h, 1.5h, and 2h)
       addSlot(16, 0, 17, 0, '1 Hour');
       addSlot(16, 30, 17, 30, '1 Hour');
       addSlot(17, 0, 18, 0, '1 Hour');
@@ -88,28 +114,24 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
     }
   } else if (programId === 'nama-bhiksha') {
     if (isWeekend) {
-      // Morning window: 10:00 - 12:30
-      // 0.5h slots
       addSlot(10, 0, 10, 30, '30 Minutes');
       addSlot(10, 30, 11, 0, '30 Minutes');
       addSlot(11, 0, 11, 30, '30 Minutes');
       addSlot(11, 30, 12, 0, '30 Minutes');
       addSlot(12, 0, 12, 30, '30 Minutes');
-      // 1h slots
       addSlot(10, 0, 11, 0, '1 Hour');
       addSlot(10, 30, 11, 30, '1 Hour');
       addSlot(11, 0, 12, 0, '1 Hour');
       addSlot(11, 30, 12, 30, '1 Hour');
     }
-    // Any day evening: 4:00 - 7:30
-    // 0.5h slots
-    for (let h = 16; h <= 18; h++) {
+
+    for (let h = 16; h <= 18; h += 1) {
       addSlot(h, 0, h, 30, '30 Minutes');
       addSlot(h, 30, h + 1, 0, '30 Minutes');
     }
     addSlot(19, 0, 19, 30, '30 Minutes');
-    // 1h slots
-    for (let h = 16; h <= 18; h++) {
+
+    for (let h = 16; h <= 18; h += 1) {
       addSlot(h, 0, h + 1, 0, '1 Hour');
       addSlot(h, 30, h + 1, 30, '1 Hour');
     }
@@ -119,10 +141,9 @@ export const generateSlots = (programId: string, date: Date): TimeSlot[] => {
 };
 
 export const isDateSelectable = (programId: string, date: Date, bookedDates: string[] = []): boolean => {
-  // Prevent selection of past dates
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
 
@@ -145,5 +166,6 @@ export const isDateSelectable = (programId: string, date: Date, bookedDates: str
   if (programId === 'nama-ruchi') {
     return day === 0 || day === 6 || day === 5;
   }
-  return true; // Nama Bhiksha any day
+
+  return true;
 };

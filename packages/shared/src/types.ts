@@ -1,3 +1,8 @@
+export interface ProgramChecklist {
+  label?: string;
+  href: string;
+}
+
 export interface DevotionalProgram {
   id: string;
   name: string;
@@ -8,26 +13,6 @@ export interface DevotionalProgram {
   donationAmount?: string;
   imageUrl?: string;
   checklist?: ProgramChecklist;
-}
-
-export interface ProgramChecklist {
-  label?: string;
-  href: string;
-}
-
-export enum Page {
-  HOME = 'home',
-  BOOKING_CALENDAR = 'booking_calendar',
-  BOOKING_FORM = 'booking_form',
-  BOOKING_PROCESSING = 'booking_processing',
-  BOOKING_FAILED = 'booking_failed',
-  SUCCESS = 'success',
-  INSTRUCTIONS = 'instructions',
-  RESERVATION_CONFIRMATION = 'reservation_confirmation',
-  RESERVATION_OPTIONS = 'reservation_options',
-  RESERVATION_LOOKUP = 'reservation_lookup',
-  RESERVATION_EDIT = 'reservation_edit',
-  RESERVATION_RESULT = 'reservation_result'
 }
 
 export interface TimeSlot {
@@ -69,6 +54,7 @@ export interface ReservationLookupData {
   time?: string;
   email?: string;
 }
+
 export interface ReservationDetails {
   programType: string;
   date: string;
@@ -78,6 +64,8 @@ export interface ReservationDetails {
   occasion?: string;
 }
 
-export interface FormErrors {
-  [key: string]: string;
+export interface BookingSubmitResult {
+  success: boolean;
+  status: number | null;
+  message?: string;
 }

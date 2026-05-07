@@ -3,26 +3,32 @@
 ## Tech Stack
 
 - Runtime: Vite + React 19 + TypeScript
-- Styling: Tailwind CDN classes + inline global CSS in `index.html`
-- API Integration: Fetch-based client in `services/googleSheetsService.ts`
+- Styling: Tailwind CDN classes + inline global CSS in `apps/web/index.html`
+- API Integration: Fetch-based client in `apps/web/src/services/googleSheetsService.ts`
 - Hosting base path: `/homebookings/` (configured in `vite.config.ts`)
+- Shared core module: `packages/shared` (types, booking rules, API client, image manifest)
+- Mobile app: Expo + React Native in `apps/mobile`
 
 ## High-Level Structure
 
-- `App.tsx`
+- `apps/web/src/App.tsx`
   - Owns top-level UI state, page switching, booking/reservation flow orchestration, and modal visibility.
-- `components/`
+- `apps/web/src/components/`
   - Stateless/presentational blocks for header/footer/cards/modals/form/calendar.
-- `services/googleSheetsService.ts`
-  - Centralized API client for booking create, booking fetch, reservation verify/update/cancel.
-- `utils/`
-  - Business helpers for slots, dates, routes, program normalization/rules, and asset URL resolution.
-- `constants.tsx`
-  - Program catalog and static constants (e.g., donation email).
-- `types.ts`
-  - Shared app domain types.
+- `apps/web/src/services/googleSheetsService.ts`
+  - Web adapter around shared `packages/shared` API client.
+- `apps/web/src/utils/`
+  - Web routing and asset helpers; date/program/slot helpers now re-export shared core utilities.
+- `apps/web/src/constants.tsx`
+  - Web export of shared program catalog/constants.
+- `apps/web/src/types.ts`
+  - Web page/form types plus re-exported shared domain types.
+- `packages/shared/`
+  - Shared API client, slot/date/program logic, availability helpers, generated image manifest, and domain types for web + mobile.
+- `apps/mobile/`
+  - Native mobile app screens for booking and reservation flows.
 
-## State Model (`App.tsx`)
+## State Model (`apps/web/src/App.tsx`)
 
 Main state groups:
 
@@ -47,7 +53,7 @@ Derived state uses `useMemo` for:
 
 ## Routing Model
 
-Custom route mapping is handled by `utils/routeUtils.ts`:
+Custom route mapping is handled by `apps/web/src/utils/routeUtils.ts`:
 
 - `getPathForPage(page, reservationMode)`
 - `parsePathToPage(pathname)`
@@ -56,7 +62,7 @@ The app updates URL via `history.pushState` and listens to `popstate` to keep br
 
 ## Booking Rules
 
-Rules are enforced by `utils/slotUtils.ts` + `App.tsx` checks:
+Rules are enforced by `apps/web/src/utils/slotUtils.ts` + `apps/web/src/App.tsx` checks:
 
 - Program-specific allowed days and slot windows
 - Full-day blocking for most programs
@@ -65,6 +71,7 @@ Rules are enforced by `utils/slotUtils.ts` + `App.tsx` checks:
   - slot-level blocking
 - Satsang:
   - blocks evening slots only on affected date
+  - "Evening" blocking starts at 4:00 PM, so morning slots ending at 12:30 PM remain bookable
 
 ## Reservation Management
 

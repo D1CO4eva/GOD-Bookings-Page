@@ -1,12 +1,17 @@
 import { DevotionalProgram } from './types';
 
+export const DEFAULT_API_BASE = 'https://god-auth-service-693007788010.us-central1.run.app';
+
+export const CONTACT_EMAIL = 'atlantanamadwaar@gmail.com';
+export const CONTACT_PHONE = '404-788-7391';
 export const ZELLE_EMAIL = 'atlanta@godivinity.org';
 
 export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'radha-kalyanam',
     name: 'Radha Kalyanam',
-    description: 'Sri Radha and Krishna, accompanied by Atlanta Namadwaar Bhagavathas, celebrate their divine marriage in a devotional ceremony that\'s filled with bhajans and prayers!',
+    description:
+      "Sri Radha and Krishna, accompanied by Atlanta Namadwaar Bhagavathas, celebrate their divine marriage in a devotional ceremony that's filled with bhajans and prayers!",
     duration: '3 Hours',
     icon: 'fa-hands-praying',
     videoUrl: 'https://youtube.com/shorts/C2lnjuv50Zw?si=-1eiWMtvjzvxEYre',
@@ -20,7 +25,8 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nikunja-utsavam',
     name: 'Nikunja Utsavam',
-    description: 'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at its peak!',
+    description:
+      'Invite Sri Radha and Krishna to your home to relish their darshan in the divine Nikunjam, where their love is at its peak!',
     duration: '2 Hours',
     icon: 'fa-sun',
     donationAmount: '$401',
@@ -33,7 +39,8 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'thirumanjanam',
     name: 'Thirumanjanam',
-    description: 'Experience the divine Abhishek of Sri Radha and Krishna right in your home with Veda Parayanam, Bhajans, and Mahamantra Kirtan!',
+    description:
+      'Experience the divine Abhishek of Sri Radha and Krishna right in your home with Veda Parayanam, Bhajans, and Mahamantra Kirtan!',
     duration: '2 Hours',
     icon: 'fa-water',
     donationAmount: '$351',
@@ -56,7 +63,7 @@ export const PROGRAMS: DevotionalProgram[] = [
   {
     id: 'nama-bhiksha',
     name: 'Nama Bhiksha',
-    description: 'Atlanta Bhagavathas come to your home and chant Mahamantra for you and your family\'s welfare!',
+    description: "Atlanta Bhagavathas come to your home and chant Mahamantra for you and your family's welfare!",
     duration: '30 min - 1 Hour',
     icon: 'fa-heart',
     donationAmount: 'Any amount appreciated',

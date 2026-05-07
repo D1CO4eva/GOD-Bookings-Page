@@ -1,4 +1,4 @@
-export const resolvePublicAssetUrl = (url: string): string => {
+export const resolvePublicAssetUrl = (url: string, baseUrl: string): string => {
   if (!url) {
     return url;
   }
@@ -7,7 +7,7 @@ export const resolvePublicAssetUrl = (url: string): string => {
     return url;
   }
 
-  const trimmedBase = import.meta.env.BASE_URL.replace(/\/+$/, '');
+  const trimmedBase = baseUrl.replace(/\/+$/, '');
   const normalizedPath = url.replace(/^\/+/, '');
   return `${trimmedBase}/${normalizedPath}`;
 };
