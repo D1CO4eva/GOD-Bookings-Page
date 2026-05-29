@@ -1465,7 +1465,13 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
         sessionMemory,
         availabilityContext
       });
-      if (availabilityContext || isSessionMemoryQuestion(text) || (result.intent === 'info' && !hasDraftSignal(result.draft))) {
+      const isInfoOnlyReply =
+        availabilityContext ||
+        isSessionMemoryQuestion(text) ||
+        result.intent === 'info' ||
+        result.intent === 'unknown';
+
+      if (isInfoOnlyReply) {
         if (availabilityContext && Object.values(locallyInferredDraft).some(Boolean)) {
           setDraft((prevDraft) => mergeDraft(prevDraft, locallyInferredDraft));
         }
@@ -2417,14 +2423,15 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
     editSection: Exclude<EditSection, null>,
     className = ''
   ) => (
-    <div className={`rounded-xl bg-[#2E3192]/5 p-4 flex items-start justify-between gap-3 ${className}`}>
-      <div>
-        <strong>{label}:</strong> {value}
+    <div className={`rounded-lg bg-[#2E3192]/5 px-3 py-2 flex items-start justify-between gap-2 ${className}`}>
+      <div className="min-w-0 text-sm leading-snug text-gray-800">
+        <span className="block text-[0.65rem] uppercase tracking-wider font-bold text-[#2E3192]/70">{label}</span>
+        <span className="block break-words">{value}</span>
       </div>
       <button
         type="button"
         onClick={() => startEditSection(editSection)}
-        className="shrink-0 rounded-lg border border-[#2E3192]/20 bg-white px-3 py-1 text-xs font-bold text-[#2E3192] hover:bg-[#2E3192]/5"
+        className="shrink-0 rounded-md border border-[#2E3192]/20 bg-white px-2.5 py-1 text-[0.7rem] font-bold text-[#2E3192] hover:bg-[#2E3192]/5"
       >
         Edit
       </button>
@@ -2436,24 +2443,17 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
     const imageSrc = selectedProgram.imageUrl ? resolvePublicAssetUrl(selectedProgram.imageUrl) : '';
     return (
       <div className="w-full rounded-2xl bg-white border border-gray-100 shadow-lg overflow-hidden">
-        {imageSrc && (
-          <img
-            src={imageSrc}
-            alt={selectedProgram.name}
-            className="w-full h-64 object-cover"
-          />
-        )}
-        <div className="p-5 md:p-7">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
-              <h3 className="text-3xl font-bold text-[#2E3192] serif">{selectedProgram.name}</h3>
-              <p className="mt-2 text-gray-600">{selectedProgram.description}</p>
+        <div className="p-4 md:p-5">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-2xl md:text-3xl font-bold text-[#2E3192] serif">{selectedProgram.name}</h3>
+              <p className="mt-1 text-sm text-gray-600">{selectedProgram.description}</p>
             </div>
-            <div className="rounded-xl bg-[#FFCC00]/20 border border-[#FFCC00]/40 px-4 py-3 text-sm font-bold text-[#2E3192]">
+            <div className="shrink-0 rounded-xl bg-[#FFCC00]/20 border border-[#FFCC00]/40 px-3 py-2 text-sm font-bold text-[#2E3192]">
               {selectedProgram.donationAmount || 'Donation appreciated'}
             </div>
           </div>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {renderSummaryTile('Date', formatDateLong(selectedDate), 'date')}
             {renderSummaryTile('Time', slotLabel(selectedSlot), 'time')}
             {renderSummaryTile('Host', draft.name, 'host')}
@@ -2467,16 +2467,23 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
             {renderSummaryTile('Occasion', draft.occasion, 'occasion')}
             {renderSummaryTile('Notes', draft.additionalNotes || 'None', 'notes')}
           </div>
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+          <div className="mt-3">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit || isSubmitting}
-              className="flex-1 px-6 py-4 bg-[#2E3192] text-white rounded-xl font-bold hover:bg-indigo-900 transition-all shadow-lg disabled:opacity-60"
+              className="w-full px-6 py-3 bg-[#2E3192] text-white rounded-xl font-bold hover:bg-indigo-900 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Submitting...' : 'Everything Looks Good - Submit Request'}
             </button>
           </div>
+          {imageSrc && (
+            <img
+              src={imageSrc}
+              alt={selectedProgram.name}
+              className="mt-3 w-full h-auto rounded-xl"
+            />
+          )}
         </div>
       </div>
     );
@@ -2522,6 +2529,54 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
     );
   };
 
+  const renderInlineMarkdown = (text: string, keyPrefix: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    const regex = /\[([^\]\n]+?)\]\(([^)\s]+)\)|\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      const linkLabel = match[1];
+      const linkHref = match[2];
+      const boldText = match[3] || match[4];
+      const italicText = match[5] || match[6];
+      if (linkLabel && linkHref) {
+        const isExternal = /^https?:\/\//i.test(linkHref);
+        parts.push(
+          <a
+            key={`${keyPrefix}-a-${idx}`}
+            href={linkHref}
+            target={isExternal ? '_blank' : undefined}
+            rel={isExternal ? 'noopener noreferrer' : undefined}
+            download={linkHref.toLowerCase().endsWith('.docx') || linkHref.toLowerCase().endsWith('.pdf') || undefined}
+            className="font-bold text-[#2E3192] underline underline-offset-2 hover:text-indigo-900"
+          >
+            {linkLabel}
+          </a>
+        );
+      } else if (boldText) {
+        parts.push(
+          <strong key={`${keyPrefix}-b-${idx}`} className="font-bold text-[#2E3192]">
+            {boldText}
+          </strong>
+        );
+      } else if (italicText) {
+        parts.push(
+          <em key={`${keyPrefix}-i-${idx}`}>{italicText}</em>
+        );
+      }
+      lastIndex = match.index + match[0].length;
+      idx += 1;
+    }
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    return parts.length ? parts : [text];
+  };
+
   const renderMessageContent = (content: string) => {
     const blocks = content.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
 
@@ -2536,20 +2591,10 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
               <ul key={`block-${blockIndex}`} className="space-y-2">
                 {lines.map((line, lineIndex) => {
                   const cleanLine = line.replace(/^[-*]\s+/, '');
-                  const [label, ...rest] = cleanLine.split(':');
                   return (
                     <li key={`line-${lineIndex}`} className="flex gap-2">
                       <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFCC00]"></span>
-                      <span>
-                        {rest.length > 0 ? (
-                          <>
-                            <strong className="text-[#2E3192]">{label}:</strong>
-                            {rest.join(':')}
-                          </>
-                        ) : (
-                          cleanLine
-                        )}
-                      </span>
+                      <span>{renderInlineMarkdown(cleanLine, `b${blockIndex}-l${lineIndex}`)}</span>
                     </li>
                   );
                 })}
@@ -2562,7 +2607,7 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
               {lines.map((line, lineIndex) => (
                 <React.Fragment key={`line-${lineIndex}`}>
                   {lineIndex > 0 && <br />}
-                  {line}
+                  {renderInlineMarkdown(line, `b${blockIndex}-l${lineIndex}`)}
                 </React.Fragment>
               ))}
             </p>
@@ -2692,7 +2737,7 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
                   )}
                 </div>
               </div>
-              <div className="shrink-0 max-h-[45vh] flex flex-col rounded-3xl bg-white/72 backdrop-blur-md border border-white/70 shadow-xl shadow-[#2E3192]/10 p-4 md:p-5 overflow-y-auto custom-scrollbar">
+              <div className="shrink-0 flex flex-col max-h-[min(70vh,42rem)] rounded-3xl bg-white/72 backdrop-blur-md border border-white/70 shadow-xl shadow-[#2E3192]/10 p-4 md:p-5 overflow-hidden">
                 <div className="mb-4 flex items-center justify-between gap-3 shrink-0">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-gray-500 font-bold">Action panel</p>
@@ -2702,14 +2747,16 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
                     <i className="fas fa-list-check"></i>
                   </div>
                 </div>
-                {!isThinking && activeChatPanel ? (
-                  activeChatPanel
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-[#2E3192]/20 bg-white/60 p-5 text-sm text-gray-600">
-                    <p className="font-bold text-[#2E3192]">Tell Uddhav what you need.</p>
-                    <p className="mt-2">Structured controls will appear here once a program, booking lookup, or next step is ready.</p>
-                  </div>
-                )}
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 custom-scrollbar">
+                  {!isThinking && activeChatPanel ? (
+                    activeChatPanel
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-[#2E3192]/20 bg-white/60 p-5 text-sm text-gray-600">
+                      <p className="font-bold text-[#2E3192]">Tell Uddhav what you need.</p>
+                      <p className="mt-2">Structured controls will appear here once a program, booking lookup, or next step is ready.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -2733,7 +2780,7 @@ const AiBookingAgent: React.FC<AiBookingAgentProps> = ({
               </div>
               <p className="mt-4 max-w-4xl text-2xl md:text-[1.9rem] lg:text-[2.15rem] leading-tight font-semibold text-[#11185f]">
                 Radhe Radhe! My name is Uddhav.<br />
-                I am pleased to be able to assist you today in<br className="hidden md:block" />
+                I am pleased to be able to assist you today in{' '}<br className="hidden md:block" />
                 booking a home program with Atlanta Namadwaar!<br />
                 Shall we get started?
               </p>

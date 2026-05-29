@@ -53,7 +53,9 @@ const compactProgramCatalog = (programs: DevotionalProgram[]) =>
           ? 'Saturdays and Sundays only'
           : program.id === 'nama-ruchi'
             ? 'Fridays, Saturdays, and Sundays only'
-            : 'Any day, subject to slot availability'
+            : 'Any day, subject to slot availability',
+    checklistUrl: program.checklist?.href || '',
+    checklistLabel: program.checklist?.label || ''
   }));
 
 const extractJsonObject = (value: string): unknown => {
@@ -155,6 +157,18 @@ export const requestAiBookingExtraction = async ({
     'When using availabilityContext, format assistantMessage as a short introduction, a blank line, a bullet list with one program per bullet, another blank line, and a concise next-step sentence.',
     'If the user asks for a hosted-events calendar or what is hosted throughout a month, say you cannot provide hosted-event details from here and steer them toward booking eligible home programs using availabilityContext when present.',
     'If the user gives a specific booking date, do not mention hosted-event calendars unless they explicitly ask for hosted events.',
+    '# Pricing and donation questions',
+    'If the user asks about price, cost, charge, fee, or donation for a program, answer using the donationAmount field for that program from programCatalog. Frame it as a suggested donation, not a fixed fee. Example: "The suggested donation for Radha Kalyanam is $501." If donationAmount is empty for that program, say the donation is at the host\'s discretion and offer to help them proceed with the booking.',
+    'Never invent prices, taxes, or surcharges. Use only donationAmount values from programCatalog.',
+    '# Preparation and checklist questions',
+    'If the user asks what they need to buy, prepare, arrange, or bring for a program, or asks about preparations, requirements, setup, or what to expect at the program, check programCatalog for a non-empty checklistUrl for that program. If one exists, share it as a Markdown link in assistantMessage formatted exactly as [Program Checklist](URL) using the checklistUrl value verbatim. A good answer is short, names the program, and includes the Markdown link. Example: "Here is the preparation checklist for Radha Kalyanam: [Program Checklist](/program-checklists/radha-kalyanam-checklist.docx). It covers everything you need to set up at home." Do not modify, shorten, or reformat the checklistUrl.',
+    'If the program has no checklistUrl in programCatalog (e.g., Nama Ruchi or Nama Bhiksha), say a formal checklist is not published for that program and offer to connect them with the Namadwaar team. Do not link a checklist from a different program.',
+    '# Out-of-scope and nonsense handling',
+    'You can only help with: program information, availability, booking, modifying a booking, and cancelling a booking. If the user asks something unrelated (weather, news, general chitchat, jokes, coding help, etc.), politely say that is outside what you can help with here, and offer one of the booking-related things you can do.',
+    'If the user input is empty, gibberish, a single random character, or you genuinely cannot parse any intent, do not invent a booking. Set intent to "unknown", keep draft empty, and respond with a short friendly clarifying question that nudges them toward a program or date.',
+    'Never make up answers for things you do not know. If a question is reasonable but the answer is not in programCatalog/sessionMemory/availabilityContext, say you do not have that detail and suggest they contact the Namadwaar team for that question, then offer to continue the booking.',
+    '# Formatting',
+    'You may use Markdown bold (**text**) for short emphasis like program names in info answers, and Markdown links of the form [label](URL) when sharing a checklistUrl or other URL from programCatalog. Do not use other Markdown syntax in assistantMessage.',
     '# Required booking fields',
     'Required booking fields are programId, date, slotLabel or preferredPeriod, name, email, phoneNumber, street, city, state, zipCode, and occasion.',
     '# Output schema',
