@@ -15,6 +15,7 @@ export enum Page {
   BOOKING_FORM = 'booking_form',
   BOOKING_PROCESSING = 'booking_processing',
   BOOKING_FAILED = 'booking_failed',
+  AI_BOOKING = 'ai_booking',
   SUCCESS = 'success',
   INSTRUCTIONS = 'instructions',
   RESERVATION_CONFIRMATION = 'reservation_confirmation',

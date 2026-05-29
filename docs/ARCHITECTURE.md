@@ -15,8 +15,12 @@
   - Owns top-level UI state, page switching, booking/reservation flow orchestration, and modal visibility.
 - `apps/web/src/components/`
   - Stateless/presentational blocks for header/footer/cards/modals/form/calendar.
+- `apps/web/src/components/ai-booking/AiBookingAgent.tsx`
+  - Prompt-based booking page that chats with the user, extracts booking details, validates requested program day/time against shared slot rules, collects required details through embedded chat controls, shows a final review card inside the transcript, and submits through the existing booking API path.
 - `apps/web/src/services/googleSheetsService.ts`
   - Web adapter around shared `packages/shared` API client.
+- `apps/web/src/services/openRouterService.ts`
+  - AI booking proxy adapter used by the AI booking agent. It sends OpenAI/OpenRouter-style chat-completion payloads to the GOD Auth Service `/homebookings/ai-booking` endpoint; the browser does not hold the OpenRouter API key.
 - `apps/web/src/utils/`
   - Web routing and asset helpers; date/program/slot helpers now re-export shared core utilities.
 - `apps/web/src/constants.tsx`
@@ -34,6 +38,7 @@ Main state groups:
 
 - Navigation state: `currentPage`, `reservationMode`
 - Booking state: `selectedProgram`, `selectedDate`, `selectedSlot`, `isSubmitting`, `bookingSubmitError`
+- AI booking state is owned by `AiBookingAgent`; the route opens with a full-height gradient Uddhav greeting page, then continues into the same chat transcript where that greeting is the first assistant message until a final review card is shown. Successful submits pass an explicit program/date/slot selection back to `App.tsx` and reuse the same final availability and booking submission logic as the manual form.
 - Booking availability state:
   - API-backed `bookings`
   - local optimistic blocks (`localBookedDates`, `localBookedSlots`)
@@ -58,6 +63,10 @@ Custom route mapping is handled by `apps/web/src/utils/routeUtils.ts`:
 - `getPathForPage(page, reservationMode)`
 - `parsePathToPage(pathname)`
 
+AI booking route:
+
+- `/homebookings/bookwithai`
+
 The app updates URL via `history.pushState` and listens to `popstate` to keep browser navigation in sync.
 
 ## Booking Rules
@@ -72,6 +81,8 @@ Rules are enforced by `apps/web/src/utils/slotUtils.ts` + `apps/web/src/App.tsx`
 - Satsang:
   - blocks evening slots only on affected date
   - "Evening" blocking starts at 4:00 PM, so morning slots ending at 12:30 PM remain bookable
+
+The AI booking page does not bypass these rules. It uses the same generated slot list, blocked-date state, Nama Bhiksha slot limits, and Satsang evening-blocking checks before a request can be submitted. It also reuses the reservation verify/update/delete service helpers for prompt-based edit and cancellation flows.
 
 ## Reservation Management
 

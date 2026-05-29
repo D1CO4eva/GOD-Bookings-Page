@@ -22,6 +22,8 @@ export const getPathForPage = (
       return buildRoutePath('bookingconfirmed');
     case Page.BOOKING_FAILED:
       return buildRoutePath('bookingfailed');
+    case Page.AI_BOOKING:
+      return buildRoutePath('bookwithai');
     case Page.RESERVATION_CONFIRMATION:
       return buildRoutePath('confirmationnumber');
     case Page.RESERVATION_OPTIONS:
@@ -64,6 +66,8 @@ export const parsePathToPage = (
       return { page: Page.SUCCESS, reservationMode: null };
     case 'bookingfailed':
       return { page: Page.BOOKING_FAILED, reservationMode: null };
+    case 'bookwithai':
+      return { page: Page.AI_BOOKING, reservationMode: null };
     case 'confirmationnumber':
       return { page: Page.RESERVATION_CONFIRMATION, reservationMode: null };
     case 'reservationedit':

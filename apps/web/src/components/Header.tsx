@@ -44,6 +44,12 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, onOpenDonate }
           >
             Home
           </button>
+          <button
+            onClick={() => onNavigate(Page.AI_BOOKING)}
+            className={`px-3 py-1 rounded-full transition ${currentPage === Page.AI_BOOKING ? 'bg-[#2E3192] text-white' : 'text-[#2E3192] hover:bg-gray-100'}`}
+          >
+            AI Booking
+          </button>
           <button 
              onClick={() => {
                 const element = document.getElementById('programs');

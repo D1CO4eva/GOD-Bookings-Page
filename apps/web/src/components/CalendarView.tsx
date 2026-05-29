@@ -7,9 +7,10 @@ interface CalendarViewProps {
   onSelectDate: (date: Date) => void;
   selectedDate: Date | null;
   bookedDates: string[];
+  initialMonthDate?: Date | null;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, selectedDate, bookedDates }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, selectedDate, bookedDates, initialMonthDate }) => {
   const calendarStart = new Date(2026, 0, 1);
   const calendarEnd = new Date(2027, 11, 1);
   const clampToRange = (value: Date) => {
@@ -20,7 +21,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
   };
 
   const [currentMonthDate, setCurrentMonthDate] = useState(() =>
-    clampToRange(selectedDate ? selectedDate : new Date())
+    clampToRange(selectedDate ? selectedDate : initialMonthDate || new Date())
   );
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -48,8 +49,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ programId, onSelectDate, se
   useEffect(() => {
     if (selectedDate) {
       setCurrentMonthDate(clampToRange(selectedDate));
+    } else if (initialMonthDate) {
+      setCurrentMonthDate(clampToRange(initialMonthDate));
     }
-  }, [selectedDate]);
+  }, [initialMonthDate, selectedDate]);
 
   const isAtStartMonth =
     currentYear === calendarStart.getFullYear() && currentMonth === calendarStart.getMonth();

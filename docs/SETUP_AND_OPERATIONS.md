@@ -18,8 +18,23 @@ Configured via `.env`/`.env.local`:
 - `VITE_API_BASE`
   - Base URL for booking/reservation backend APIs.
   - Defaults to production service URL if unset.
+- `VITE_DEV_API_PROXY_TARGET`
+  - Optional local dev proxy target for booking APIs.
+  - Defaults to `VITE_API_BASE` when set, otherwise `http://localhost:8081`.
+  - In Vite dev only, absolute `VITE_API_BASE` values are routed through `/__booking_api` to avoid browser CORS during local review.
 - `VITE_GOOGLE_MAPS_API_KEY`
   - Required for booking-form address autocomplete.
+- `VITE_AI_BOOKING_PROXY_URL`
+  - Optional AI booking proxy endpoint.
+  - Defaults to `https://god-auth-service-693007788010.us-central1.run.app/homebookings/ai-booking`.
+  - For local proxy development, set this to `http://localhost:8080/homebookings/ai-booking`.
+- `VITE_DEV_AI_BOOKING_PROXY_TARGET`
+  - Optional Vite dev proxy target for the AI booking proxy origin.
+  - Defaults to `VITE_AI_BOOKING_PROXY_URL` origin when set, otherwise `https://god-auth-service-693007788010.us-central1.run.app`.
+  - In Vite dev, AI requests are routed through `/__ai_booking_proxy` to avoid browser CORS during local review.
+- `VITE_AI_BOOKING_MODEL`
+  - Optional model id sent to the AI booking proxy.
+  - Defaults to `openai/gpt-4o-mini` when unset.
 
 Mobile app environment variables (in `apps/mobile/.env`):
 
@@ -107,3 +122,10 @@ Set these in `.env` (or `.env.local`) before running `npm run deploy:ftps`:
   - `GET /api/reservations/verify` (lookup values sent as query params)
   - `POST /api/reservations/update`
   - `POST /api/reservations/delete`
+
+## AI Booking Notes
+
+- Local route: `/homebookings/bookwithai`.
+- The AI booking page calls the GOD Auth Service AI proxy endpoint. The proxy adds the server-side `OPENROUTER_API_KEY` and forwards the chat-completion request to OpenRouter.
+- The browser must not send `OPENROUTER_API_KEY`, `Authorization`, Google Apps Script tokens, SMTP credentials, or other secrets.
+- The page never directly confirms a booking from AI text. It extracts details, shows editable fields, recomputes availability locally, and submits through the existing booking API only after required details are complete.
