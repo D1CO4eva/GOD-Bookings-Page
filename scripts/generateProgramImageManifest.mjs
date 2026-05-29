@@ -2,8 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
-const publicImagesRoot = path.join(projectRoot, 'public', 'program-images');
-const outputFilePath = path.join(projectRoot, 'generated', 'programImageManifest.ts');
+const publicImagesRoot = path.join(projectRoot, 'apps', 'web', 'public', 'program-images');
+const outputFilePath = path.join(
+  projectRoot,
+  'packages',
+  'shared',
+  'src',
+  'programImageManifest.ts'
+);
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set([
   '.jpg',

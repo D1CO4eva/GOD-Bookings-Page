@@ -1,60 +1,60 @@
 # File Reference
 
-This reference covers every code/config file in the repository (excluding `node_modules` and built `dist` output).
+This reference covers key code/config files in the repository (excluding `node_modules` and built `dist` output).
 
-## Root Files
+## Root Orchestration
+
+| File | Purpose | Key Behavior |
+|---|---|---|
+| `package.json` | Root scripts for web/mobile workflows. | `dev`, `build`, `preview`, `check`, `mobile:*`, `deploy:ftps`. |
+| `vite.config.ts` | Web build/dev config. | Serves `apps/web`, aliases `@` and `@shared`, outputs to root `dist/`. |
+| `tsconfig.json` | Root TypeScript config. | Path aliases for `apps/web/src` and `packages/shared/src`; excludes mobile app. |
+| `scripts/generateProgramImageManifest.mjs` | Generates shared program image map. | Scans `apps/web/public/program-images`, writes `packages/shared/src/programImageManifest.ts`. |
+| `scripts/postBuildCleanup.mjs` | Removes `dist/.htaccess` after build. | Keeps deployment output aligned with hosting setup. |
+| `scripts/deployFtps.mjs` | FTPS upload script. | Uploads local build output to configured remote directory. |
+| `scripts/mobileAndroid.ps1` | Android dev launcher. | Starts/reuses emulator, starts Metro, runs Android dev client. |
+| `scripts/ios/*` | iOS operation scripts. | Preflight validation plus TestFlight/production build and submit wrappers. |
+| `README.md` | Project overview and commands. | Docs links and operational quick start. |
+
+## Web App (`apps/web/`)
 
 | File | Purpose | Key Exports / Behavior |
 |---|---|---|
-| `App.tsx` | Main application orchestrator and page renderer. | Top-level app component with booking + reservation flows. |
-| `index.tsx` | React bootstrap entrypoint. | Mounts `<App />` into `#root`. |
-| `index.html` | HTML shell and global CSS/font includes. | Root DOM node, Tailwind CDN, Font Awesome, app script include. |
-| `constants.tsx` | Static program catalog and donation contact constant. | `PROGRAMS`, `ZELLE_EMAIL`. |
-| `types.ts` | Shared domain model types and enum routes. | `Page`, `DevotionalProgram`, `BookingData`, `BookingRecord`, etc. |
-| `vite.config.ts` | Build/dev server configuration. | Base path, dev proxy, path alias plugin config. |
-| `tsconfig.json` | TypeScript compiler settings. | Bundler module resolution, React JSX, `vite/client` types. |
-| `package.json` | Project metadata and scripts. | `dev`, `build`, `preview`, `typecheck`, `check`. |
-| `package-lock.json` | NPM dependency lockfile. | Exact dependency graph snapshot. |
-| `metadata.json` | Project metadata file. | Environment/tooling metadata. |
-| `README.md` | Top-level project overview. | User-facing summary and docs link. |
+| `apps/web/index.html` | Web shell and global fonts/styles. | Mount point plus Vite entry (`/src/index.tsx`). |
+| `apps/web/src/index.tsx` | React bootstrap entrypoint. | Mounts `<App />` into `#root`. |
+| `apps/web/src/App.tsx` | Main web orchestrator and page renderer. | Booking + reservation state machine and route sync. |
+| `apps/web/src/components/*` | Web UI building blocks. | Header/footer/cards/modals/form/calendar views. |
+| `apps/web/src/services/googleSheetsService.ts` | Web API adapter. | Web-facing wrapper around shared booking client. |
+| `apps/web/src/utils/*` | Web-specific helpers and shared re-exports. | Route mapping + date/program/slot/asset helper surface. |
+| `apps/web/src/constants.tsx` | Web constants surface. | Re-exports shared `PROGRAMS` and `ZELLE_EMAIL`. |
+| `apps/web/src/types.ts` | Web page enums + shared type re-exports. | `Page`, `FormErrors`, shared domain types. |
+| `apps/web/public/.htaccess` | Apache SPA rewrite/caching config. | Ensures production route handling under `/homebookings/`. |
 
-## Components (`components/`)
+## Mobile App (`apps/mobile/`)
 
-| File | Purpose | Key Props / Behavior |
+| File | Purpose | Key Exports / Behavior |
 |---|---|---|
-| `components/Header.tsx` | Sticky top navigation/header. | Handles site/home/programs/donate actions. |
-| `components/Footer.tsx` | Footer with social/contact links. | Displays branding, links, and contact details. |
-| `components/ProgramCard.tsx` | Program listing card with media and actions. | `onBook`, `onDonate`, `onManageReservation`; uses image manifest + availability flags. |
-| `components/CalendarView.tsx` | Monthly date picker with disabled-date logic. | Uses `isDateSelectable()` to enforce availability. |
-| `components/BookingForm.tsx` | Host details form + Google Places address lookup. | Validates fields and emits normalized `BookingData`. |
-| `components/DonateModal.tsx` | Donation modal with copy-to-clipboard behavior. | Displays Zelle email and external link. |
-| `components/EventPopupModal.tsx` | Fundraiser event modal with teaser/full modes. | Handles registration CTA and body-scroll lock. |
+| `apps/mobile/App.tsx` | Native app root and navigation flow. | Booking + reservation orchestration via React Navigation. |
+| `apps/mobile/app.json` | Expo app manifest. | App identity, Android package, iOS bundle id/build number, EAS project id. |
+| `apps/mobile/eas.json` | EAS build/submit profile config. | Android preview/production plus iOS TestFlight/production profiles. |
+| `apps/mobile/src/screens/*` | Mobile booking/reservation screens. | Program browse, date/slot, form, verify/edit/cancel, result flows. |
+| `apps/mobile/src/components/ProgramCardMobile.tsx` | Mobile program card UI. | Rotating images + availability/donation/checklist/video actions. |
+| `apps/mobile/src/api/client.ts` | Mobile API client bootstrap. | Configures shared API client via Expo env vars. |
+| `apps/mobile/src/utils/programMedia.ts` | Mobile image URL adapter. | Uses shared manifest + shared asset resolver for remote image URLs. |
+| `apps/mobile/src/theme/tokens.ts` | Mobile design tokens. | Brand palette, radii, spacing, and shadows. |
+| `apps/mobile/metro.config.js` | Expo/Metro workspace config. | Watches workspace root and resolves shared dependencies correctly. |
 
-## Services (`services/`)
+## Shared Package (`packages/shared/`)
 
 | File | Purpose | Key Exports |
 |---|---|---|
-| `services/googleSheetsService.ts` | Booking/reservation API client + payload normalization. | `submitToGoogleSheets`, `fetchBookings`, `verifyReservation`, `updateReservation`, `cancelReservation`. |
-
-## Utils (`utils/`)
-
-| File | Purpose | Key Exports |
-|---|---|---|
-| `utils/slotUtils.ts` | Slot generation and date-selectability business rules. | `generateSlots`, `isDateSelectable`. |
-| `utils/dateUtils.ts` | Canonical date key helpers. | `toDateKey`, `parseDateKey`. |
-| `utils/programUtils.ts` | Program-type normalization and availability helpers. | `normalizeProgramType`, `isSatsangType`, `isNamaBhikshaType`, `getProgramAvailabilityFlags`, `resolveProgramByType`, etc. |
-| `utils/routeUtils.ts` | App route-path mapping/parsing. | `getPathForPage`, `parsePathToPage`. |
-| `utils/assetUtils.ts` | Public asset path resolver with base-path awareness. | `resolvePublicAssetUrl`. |
-
-## Generated / Script Files
-
-| File | Purpose | Notes |
-|---|---|---|
-| `generated/programImageManifest.ts` | Generated image map for program image folders. | Auto-generated; do not hand-edit. |
-| `scripts/generateProgramImageManifest.mjs` | Build/dev pre-step that scans `public/program-images` and emits manifest. | Invoked by `predev` and `prebuild`. |
-
-## Public Hosting Config
-
-| File | Purpose | Notes |
-|---|---|---|
-| `public/.htaccess` | Apache rewrite/caching configuration for SPA hosting. | Ensures client-side routing compatibility. |
+| `packages/shared/src/types.ts` | Shared domain models for web + mobile. | `DevotionalProgram`, `BookingData`, `ReservationDetails`, etc. |
+| `packages/shared/src/programCatalog.ts` | Shared program catalog/constants. | `PROGRAMS`, `ZELLE_EMAIL`, `DEFAULT_API_BASE`. |
+| `packages/shared/src/apiClient.ts` | Shared booking/reservation API client. | `createBookingApiClient`. |
+| `packages/shared/src/slotUtils.ts` | Shared slot/day rule helpers. | `generateSlots`, `isDateSelectable`, `toSlotLabel`. |
+| `packages/shared/src/programUtils.ts` | Shared program normalization/rule helpers. | `normalizeProgramType`, `isNamaBhikshaType`, `resolveProgramByType`, etc. |
+| `packages/shared/src/availabilityUtils.ts` | Shared availability derivation helpers. | Blocked-date/slot derivation for booking/edit flows. |
+| `packages/shared/src/dateUtils.ts` | Shared date-key helpers. | `toDateKey`, `parseDateKey`. |
+| `packages/shared/src/assetUtils.ts` | Shared static asset URL helper. | `resolvePublicAssetUrl`. |
+| `packages/shared/src/programImageManifest.ts` | Generated shared image manifest. | Program ID -> image URL list map. |
+| `packages/shared/src/index.ts` | Shared barrel exports. | Single import surface for common shared APIs. |

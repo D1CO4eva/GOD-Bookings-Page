@@ -1,4 +1,4 @@
-import { DevotionalProgram } from '../types';
+import { DevotionalProgram } from './types';
 
 const KNOWN_PROGRAM_TYPES = new Set([
   'radha kalyanam',

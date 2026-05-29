@@ -9,7 +9,7 @@ import DonateModal from './components/DonateModal';
 import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot, ReservationLookupData, ReservationDetails } from './types';
 import { PROGRAMS } from './constants';
 import { fetchBookings, submitToGoogleSheets, verifyReservation, updateReservation, cancelReservation } from './services/googleSheetsService';
-import { generateSlots } from './utils/slotUtils';
+import { generateSlots, isSatsangBlockedSlot } from './utils/slotUtils';
 import { toDateKey, parseDateKey } from './utils/dateUtils';
 import {
   getProgramAvailabilityFlags,
@@ -346,7 +346,7 @@ const App: React.FC = () => {
     const rawSlots = generateSlots(selectedProgram.id, reservationEditDate);
     const hasSatsang = reservationSatsangDates.includes(dateStr);
     const slotsAfterSatsang = hasSatsang
-      ? rawSlots.filter((slot) => slot.period !== 'Evening')
+      ? rawSlots.filter((slot) => !isSatsangBlockedSlot(slot))
       : rawSlots;
 
     if (selectedProgram.id !== 'nama-bhiksha') {
@@ -839,7 +839,7 @@ const App: React.FC = () => {
           const hasSatsang = latestBookings.some(
             booking => booking.date === dateStr && isSatsangType(booking.type)
           );
-          if (hasSatsang) {
+          if (hasSatsang && selectedSlot && isSatsangBlockedSlot(selectedSlot)) {
             alert("Sorry, evening slots are unavailable on this date due to a Satsang booking.");
             return;
           }
@@ -866,7 +866,7 @@ const App: React.FC = () => {
             if (booking.date !== dateStr) return false;
             if (isNamaBhikshaType(booking.type)) return false;
             if (isSatsangType(booking.type)) {
-              return selectedSlot?.period === 'Evening';
+              return selectedSlot ? isSatsangBlockedSlot(selectedSlot) : false;
             }
             if (isSpecialProgramType(booking.type)) {
               return true;
@@ -1002,7 +1002,7 @@ const App: React.FC = () => {
         const hasSatsang = satsangDateStr ? satsangDates.includes(satsangDateStr) : false;
         const availabilityFlags = getProgramAvailabilityFlags(selectedProgram?.id);
         const slotsAfterSatsang = hasSatsang
-          ? rawSlots.filter(slot => slot.period !== 'Evening')
+          ? rawSlots.filter(slot => !isSatsangBlockedSlot(slot))
           : rawSlots;
         const availableSlots =
           selectedDate && selectedProgram?.id === 'nama-bhiksha'

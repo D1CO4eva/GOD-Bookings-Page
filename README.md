@@ -5,6 +5,13 @@ A welcoming booking experience for Atlanta Namadwaar devotional home programs. V
 Live site: https://atlanta.godivinity.org
 Subpage deployment path: https://atlanta.godivinity.org/homebookings/
 
+## Repository Layout
+
+- `apps/web` - Vite + React web app.
+- `apps/mobile` - Expo + React Native mobile app.
+- `packages/shared` - Shared domain/types/rules/API client and generated image manifest used by both apps.
+- `scripts` - Build/deploy utility scripts (manifest generation, FTPS deploy, post-build cleanup).
+
 ## Documentation
 
 Full technical docs are available in the [`docs/`](./docs) folder.
@@ -14,6 +21,7 @@ Full technical docs are available in the [`docs/`](./docs) folder.
 - Functional flows: [`docs/FLOWS.md`](./docs/FLOWS.md)
 - Setup/operations: [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md)
 - File-by-file reference: [`docs/FILE_REFERENCE.md`](./docs/FILE_REFERENCE.md)
+- Mobile app setup: [`docs/MOBILE_APP.md`](./docs/MOBILE_APP.md)
 
 ## App Flow
 
@@ -56,6 +64,21 @@ A reset option clears only the locally blocked dates in the current browser sess
 - `npm run typecheck`
 - `npm run build`
 - `npm run check`
+
+## Mobile App (Expo)
+
+- `npm run mobile:start`
+  - Starts Expo development server for `apps/mobile`.
+- `npm run mobile:android`
+  - Auto-starts Android emulator (if needed), then builds/runs Android client.
+- `npm run mobile:ios`
+  - iOS dev entrypoint (macOS simulator) and cloud-build guidance on Windows.
+- `npm run mobile:build:ios:testflight`
+  - Builds iOS TestFlight artifact in EAS cloud.
+- `npm run mobile:submit:ios:testflight`
+  - Submits iOS artifact to TestFlight via EAS submit profile.
+- `npm run mobile:test`
+  - Runs current mobile test script scaffold.
 
 ## Local Development
 
