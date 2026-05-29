@@ -1,6 +1,6 @@
 ﻿# Atlanta Namadwaar Home Program Booking
 
-A welcoming booking experience for Atlanta Namadwaar devotional home programs. Visitors can explore programs, choose an available date and time, and submit a request in just a few steps.
+A welcoming booking experience for Atlanta Namadwaar devotional home programs. Visitors can explore programs, choose an available date and time, use an AI booking agent, submit a request, and manage an existing booking in just a few steps.
 
 Live site: https://atlanta.godivinity.org
 Subpage deployment path: https://atlanta.godivinity.org/homebookings/
@@ -26,10 +26,11 @@ Full technical docs are available in the [`docs/`](./docs) folder.
 ## App Flow
 
 1. **Browse programs** on the home page, including images and brief descriptions.
-2. **Select a program** to open the booking calendar.
+2. **Select a program** to open the booking calendar, or use **Book with AI** to describe a booking, edit, or cancellation request in natural language.
 3. **Choose a date and time slot** based on availability.
 4. **Enter contact details** and submit the request.
-5. **Receive confirmation** with next‑step contact information.
+5. **Receive confirmation** with next-step contact information.
+6. **Edit or cancel later** by giving the AI booking agent the confirmation number.
 
 ## Programs Offered
 
@@ -84,6 +85,8 @@ A reset option clears only the locally blocked dates in the current browser sess
 
 - `npm run dev`
   - Starts local development server on `http://localhost:5000/homebookings/`.
+- Prompt-based booking is available locally at `http://localhost:5000/homebookings/bookwithai`.
+- AI booking calls the GOD Auth Service proxy at `/homebookings/ai-booking`; the browser does not receive or send an OpenRouter API key.
 
 ## FTPS Deployment
 

@@ -76,12 +76,7 @@ const loadGooglePlacesScript = (apiKey: string): Promise<void> => {
     const existing = document.getElementById(GOOGLE_PLACES_SCRIPT_ID) as HTMLScriptElement | null;
 
     if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener(
-        'error',
-        () => reject(new Error('Failed to load Google Places script')),
-        { once: true }
-      );
+      void waitForGooglePlacesApi().then(resolve).catch(reject);
       return;
     }
 
@@ -207,6 +202,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
       const googleObj = (window as any).google;
 
       const predictions: any[] = await new Promise(resolve => {
+        const timeoutId = window.setTimeout(() => resolve([]), 8000);
         autocompleteServiceRef.current.getPlacePredictions(
           {
             input: query,
@@ -214,6 +210,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             types: ['address']
           },
           (results: any, status: any) => {
+            window.clearTimeout(timeoutId);
             if (status !== googleObj.maps.places.PlacesServiceStatus.OK || !results) {
               resolve([]);
               return;
@@ -251,12 +248,17 @@ const BookingForm: React.FC<BookingFormProps> = ({
       const googleObj = (window as any).google;
 
       const details: any = await new Promise((resolve, reject) => {
+        const timeoutId = window.setTimeout(
+          () => reject(new Error('Address details request timed out.')),
+          8000
+        );
         placesServiceRef.current.getDetails(
           {
             placeId: suggestion.placeId,
             fields: ['formatted_address', 'address_components']
           },
           (result: any, status: any) => {
+            window.clearTimeout(timeoutId);
             if (status !== googleObj.maps.places.PlacesServiceStatus.OK || !result) {
               reject(new Error('Unable to load full address details.'));
               return;

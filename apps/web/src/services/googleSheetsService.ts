@@ -8,7 +8,11 @@ import { DEFAULT_API_BASE } from '@shared/programCatalog';
 import type { BookingSubmitResult } from '@shared/types';
 
 const normalizeApiBase = (value: string) => value.replace(/\/+$/, '');
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
+const configuredApiBase = import.meta.env.VITE_API_BASE || DEFAULT_API_BASE;
+const API_BASE =
+  import.meta.env.DEV && /^https?:\/\//i.test(configuredApiBase)
+    ? '/__booking_api'
+    : normalizeApiBase(configuredApiBase);
 
 const bookingApiClient = createBookingApiClient({ apiBase: API_BASE, fetchImpl: fetch });
 

@@ -23,8 +23,10 @@ This reference covers key code/config files in the repository (excluding `node_m
 | `apps/web/index.html` | Web shell and global fonts/styles. | Mount point plus Vite entry (`/src/index.tsx`). |
 | `apps/web/src/index.tsx` | React bootstrap entrypoint. | Mounts `<App />` into `#root`. |
 | `apps/web/src/App.tsx` | Main web orchestrator and page renderer. | Booking + reservation state machine and route sync. |
-| `apps/web/src/components/*` | Web UI building blocks. | Header/footer/cards/modals/form/calendar views. |
+| `apps/web/src/components/*` | Web UI building blocks. | Header/footer/cards/modals/form/calendar views plus the AI booking agent. |
+| `apps/web/src/components/ai-booking/*` | AI booking feature UI. | Uddhav chat page, guided booking controls, and reservation-management panels. |
 | `apps/web/src/services/googleSheetsService.ts` | Web API adapter. | Web-facing wrapper around shared booking client. |
+| `apps/web/src/services/openRouterService.ts` | AI service adapter. | Calls the GOD Auth Service AI booking proxy and normalizes structured booking extraction. |
 | `apps/web/src/utils/*` | Web-specific helpers and shared re-exports. | Route mapping + date/program/slot/asset helper surface. |
 | `apps/web/src/constants.tsx` | Web constants surface. | Re-exports shared `PROGRAMS` and `ZELLE_EMAIL`. |
 | `apps/web/src/types.ts` | Web page enums + shared type re-exports. | `Page`, `FormErrors`, shared domain types. |

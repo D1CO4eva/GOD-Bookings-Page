@@ -4,12 +4,13 @@ import Header from './components/Header';
 import ProgramCard from './components/ProgramCard';
 import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
+import AiBookingAgent from './components/ai-booking';
 import Footer from './components/Footer';
 import DonateModal from './components/DonateModal';
 import { Page, DevotionalProgram, BookingData, BookingRecord, TimeSlot, ReservationLookupData, ReservationDetails } from './types';
 import { PROGRAMS } from './constants';
 import { fetchBookings, submitToGoogleSheets, verifyReservation, updateReservation, cancelReservation } from './services/googleSheetsService';
-import { generateSlots, isSatsangBlockedSlot } from './utils/slotUtils';
+import { generateSlots, isDateSelectable, isSatsangBlockedSlot } from './utils/slotUtils';
 import { toDateKey, parseDateKey } from './utils/dateUtils';
 import {
   getProgramAvailabilityFlags,
@@ -64,8 +65,13 @@ const parseReservationActionLink = (
   return { confirmationNumber, action };
 };
 
+const getInitialPage = (): Page => {
+  const initialRoute = parsePathToPage(window.location.pathname);
+  return initialRoute.page === Page.AI_BOOKING ? Page.AI_BOOKING : Page.HOME;
+};
+
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
+  const [currentPage, setCurrentPage] = useState<Page>(getInitialPage);
   const [selectedProgram, setSelectedProgram] = useState<DevotionalProgram | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -371,6 +377,37 @@ const App: React.FC = () => {
     reservationSatsangDates,
     selectedProgram
   ]);
+
+  const getAvailableSlotsForBooking = (program: DevotionalProgram, date: Date): TimeSlot[] => {
+    const dateStr = toDateKey(date);
+    const calendarBlocks =
+      program.id === 'nama-bhiksha'
+        ? Array.from(new Set([...blockedDates, ...namaBhikshaFullyBookedDates]))
+        : blockedDates;
+
+    if (!isDateSelectable(program.id, date, calendarBlocks)) {
+      return [];
+    }
+
+    const rawSlots = generateSlots(program.id, date);
+    const slotsAfterSatsang = satsangDates.includes(dateStr)
+      ? rawSlots.filter((slot) => !isSatsangBlockedSlot(slot))
+      : rawSlots;
+
+    if (program.id !== 'nama-bhiksha') {
+      return slotsAfterSatsang;
+    }
+
+    if (namaBhikshaFullyBookedDates.includes(dateStr)) {
+      return [];
+    }
+
+    const bookedTimes = new Set(namaBhikshaSlotsByDate[dateStr] || []);
+    return slotsAfterSatsang.filter((slot) => {
+      const label = `${slot.start} - ${slot.end}`;
+      return !(bookedTimes.has(label) || bookedTimes.has(slot.start));
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -826,20 +863,25 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = async (data: BookingData) => {
+  const submitBookingRequest = async (
+    data: BookingData,
+    program: DevotionalProgram,
+    date: Date,
+    slot: TimeSlot
+  ) => {
     setIsSubmitting(true);
     setBookingSubmitError('');
     try {
       const latestBookings = bookings;
 
-      if (selectedDate) {
-        const dateStr = toDateKey(selectedDate);
-        const programId = selectedProgram?.id;
+      if (date) {
+        const dateStr = toDateKey(date);
+        const programId = program.id;
         if (programId === 'nama-bhiksha') {
           const hasSatsang = latestBookings.some(
             booking => booking.date === dateStr && isSatsangType(booking.type)
           );
-          if (hasSatsang && selectedSlot && isSatsangBlockedSlot(selectedSlot)) {
+          if (hasSatsang && isSatsangBlockedSlot(slot)) {
             alert("Sorry, evening slots are unavailable on this date due to a Satsang booking.");
             return;
           }
@@ -856,8 +898,8 @@ const App: React.FC = () => {
             alert("Sorry, that date is already fully booked for Nama Bhiksha. Please choose another date.");
             return;
           }
-          const selectedTime = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
-          if (selectedTime && (bookedTimes.has(selectedTime) || bookedTimes.has(selectedSlot?.start || ''))) {
+          const selectedTime = `${slot.start} - ${slot.end}`;
+          if (selectedTime && (bookedTimes.has(selectedTime) || bookedTimes.has(slot.start))) {
             alert("Sorry, that time slot was just booked. Please choose another slot.");
             return;
           }
@@ -866,7 +908,7 @@ const App: React.FC = () => {
             if (booking.date !== dateStr) return false;
             if (isNamaBhikshaType(booking.type)) return false;
             if (isSatsangType(booking.type)) {
-              return selectedSlot ? isSatsangBlockedSlot(selectedSlot) : false;
+              return isSatsangBlockedSlot(slot);
             }
             if (isSpecialProgramType(booking.type)) {
               return true;
@@ -891,16 +933,14 @@ const App: React.FC = () => {
       }
 
       // Only block the selected date/slot locally after confirmed API success.
-      if (selectedDate) {
-        const dateStr = toDateKey(selectedDate);
-        if (selectedProgram?.id === 'nama-bhiksha') {
-          const timeLabel = selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end}` : '';
-          if (timeLabel) {
-            setLocalBookedSlots(prev => ({
-              ...prev,
-              [dateStr]: prev[dateStr] ? Array.from(new Set([...prev[dateStr], timeLabel])) : [timeLabel]
-            }));
-          }
+      if (date) {
+        const dateStr = toDateKey(date);
+        if (program.id === 'nama-bhiksha') {
+          const timeLabel = `${slot.start} - ${slot.end}`;
+          setLocalBookedSlots(prev => ({
+            ...prev,
+            [dateStr]: prev[dateStr] ? Array.from(new Set([...prev[dateStr], timeLabel])) : [timeLabel]
+          }));
         } else {
           setLocalBookedDates(prev => (prev.includes(dateStr) ? prev : [...prev, dateStr]));
         }
@@ -917,6 +957,28 @@ const App: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (data: BookingData) => {
+    if (!selectedProgram || !selectedDate || !selectedSlot) return;
+    await submitBookingRequest(data, selectedProgram, selectedDate, selectedSlot);
+  };
+
+  const handleAiBookingSubmit = async (
+    data: BookingData,
+    program: DevotionalProgram,
+    date: Date,
+    slot: TimeSlot
+  ) => {
+    setSelectedProgram(program);
+    setSelectedDate(date);
+    setSelectedSlot(slot);
+    await submitBookingRequest(data, program, date, slot);
+  };
+
+  const handleAiReservationChanged = async () => {
+    const refreshed = await fetchBookings();
+    setBookings(refreshed);
   };
 
   const renderContent = () => {
@@ -949,6 +1011,13 @@ const App: React.FC = () => {
                       className="w-full sm:w-auto bg-[#FFCC00] text-[#2E3192] px-12 py-5 rounded-full font-bold text-xl hover:shadow-2xl hover:scale-105 transition-all shadow-md active:scale-95"
                     >
                       Browse Programs
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(Page.AI_BOOKING)}
+                      className="w-full sm:w-auto bg-white text-[#2E3192] px-12 py-5 rounded-full font-bold text-xl hover:shadow-2xl hover:scale-105 transition-all shadow-md active:scale-95 flex items-center justify-center space-x-3"
+                    >
+                      <i className="fas fa-wand-magic-sparkles"></i>
+                      <span>Book with AI</span>
                     </button>
                     <button 
                       onClick={() => setIsDonateOpen(true)}
@@ -994,6 +1063,22 @@ const App: React.FC = () => {
               </div>
             </section>
           </>
+        );
+
+      case Page.AI_BOOKING:
+        return (
+          <AiBookingAgent
+            programs={PROGRAMS}
+            bookings={bookings}
+            isSubmitting={isSubmitting}
+            getAvailableSlots={getAvailableSlotsForBooking}
+            verifyReservation={verifyReservation}
+            updateReservation={updateReservation}
+            cancelReservation={cancelReservation}
+            onSubmitBooking={handleAiBookingSubmit}
+            onReservationChanged={handleAiReservationChanged}
+            onBack={() => setCurrentPage(Page.HOME)}
+          />
         );
 
       case Page.BOOKING_CALENDAR:
